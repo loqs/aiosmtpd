@@ -151,6 +151,11 @@ rst_prolog = f"""
 .. |copyright| replace:: {copyright}
 """
 
+# Ignore the following broken references
+nitpick_ignore = [
+    ('py:class', '_Missing'),
+]
+
 # endregion
 
 # region -- Extensions configuration ---------------------------------------------
