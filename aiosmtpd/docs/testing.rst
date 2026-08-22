@@ -113,7 +113,7 @@ Markers
     Provides parameters to the :fixture:`~aiosmtpd.tests.conftest.client` fixture.
 
     :param connect_to: Address to connect to. Defaults to ``Global.SrvAddr``
-    :type connect_to: :class:`HostPort`
+    :type connect_to: ``HostPort``
 
 .. decorator:: controller_data(...)
 
