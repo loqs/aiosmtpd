@@ -487,7 +487,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         handler = self.protocol.event_handler
         assert handler.called
 
-    def _assert_valid(self, af: AF, proto: PROTO, srcip: str, dstip: str, srcport: int, dstport: int, testline: str):
+    def _assert_valid(self, af: AF, proto: PROTO, srcip: str, dstip: str, srcport: int, dstport: int, testline: str) -> None:
         self.protocol.data_received(testline.encode("ascii"))
         self.runner()
         assert self.protocol.session.proxy_data.error == ""
@@ -582,7 +582,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             rest=b"",
         )
 
-    def _assert_invalid(self, testline: str, expect_err: str = ""):
+    def _assert_invalid(self, testline: str, expect_err: str = "") -> None:
         self.protocol.data_received(testline.encode("ascii"))
         self.runner()
         handler: ProxyPeekerHandler = self.protocol.event_handler

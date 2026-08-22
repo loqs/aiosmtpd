@@ -1072,7 +1072,7 @@ class TestHooks:
 
 
 class TestDeprecation:
-    def _process_message_testing(self, controller: Controller, client: SMTPClient):
+    def _process_message_testing(self, controller: Controller, client: SMTPClient) -> None:
         assert isinstance(controller, Controller)
         expectedre = r"Use handler.handle_DATA\(\) instead of .process_message\(\)"
         with pytest.warns(DeprecationWarning, match=expectedre):

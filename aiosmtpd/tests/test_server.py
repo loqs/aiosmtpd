@@ -44,7 +44,7 @@ class SlowStartController(Controller):
         kwargs.setdefault("ready_timeout", 0.5)
         super().__init__(*args, **kwargs)
 
-    def _run(self, ready_event: Event):
+    def _run(self, ready_event: Event) -> None:
         time.sleep(self.ready_timeout * 1.5)
         super()._run(ready_event)
 
@@ -58,7 +58,7 @@ class SlowFactoryController(Controller):
         time.sleep(self.ready_timeout * 3)
         return super().factory()
 
-    def _factory_invoker(self):
+    def _factory_invoker(self) -> None:
         time.sleep(self.ready_timeout * 3)
         return super()._factory_invoker()
 
@@ -413,7 +413,7 @@ class TestUnthreaded:
     def runner(self) -> Callable:
         thread: Optional[Thread] = None
 
-        def _runner(loop: asyncio.AbstractEventLoop):
+        def _runner(loop: asyncio.AbstractEventLoop) -> None:
             loop.run_forever()
 
         def starter(loop: asyncio.AbstractEventLoop) -> None:

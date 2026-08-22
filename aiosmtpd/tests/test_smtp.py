@@ -1282,7 +1282,7 @@ class TestAuthenticator(_CommonMethods):
     auth_required=True,
 )
 class TestRequiredAuthentication(_CommonMethods):
-    def _login(self, client: SMTPClient):
+    def _login(self, client: SMTPClient) -> None:
         self._ehlo(client)
         resp = client.login("goodlogin", "goodpasswd")
         assert resp == S.S235_AUTH_SUCCESS
@@ -1366,7 +1366,7 @@ class TestResetCommands:
         client: SMTPClient,
         mail_from: str,
         rcpt_tos: List[str],
-    ):
+    ) -> None:
         client.mail(mail_from)
         for rcpt in rcpt_tos:
             client.rcpt(rcpt)
@@ -1983,7 +1983,7 @@ class TestLimits(_CommonMethods):
         cmd: str,
         *args,
         ok_expected: Optional[StatusCode] = None
-    ):
+    ) -> None:
         code, _ = client.ehlo("example.com")
         assert code == 250
         func = getattr(client, cmd)
