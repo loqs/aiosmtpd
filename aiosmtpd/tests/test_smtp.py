@@ -81,7 +81,7 @@ def assert_nopassleak(passwd: str, record_tuples: List[Tuple[str, int, str]]) ->
 
 
 class UndescribableError(Exception):
-    def __str__(self):
+    def __str__(self) -> str:
         raise Exception()
 
 

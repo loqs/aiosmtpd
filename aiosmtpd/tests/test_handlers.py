@@ -115,7 +115,7 @@ class EHLOHandlerNew:
     hostname = None
     orig_responses = []
 
-    def __init__(self, *features):
+    def __init__(self, *features) -> None:
         self.features = features or tuple()
 
     async def handle_EHLO(
@@ -215,7 +215,7 @@ class DeprecatedHookController(Controller):
 
         warnings: list = None
 
-        def __init__(self, *args, **kws):
+        def __init__(self, *args, **kws) -> None:
             super().__init__(*args, **kws)
 
         async def ehlo_hook(self) -> None:

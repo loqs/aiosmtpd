@@ -96,7 +96,7 @@ HANDSHAKES = {
 
 
 class ProxyPeekerHandler(Sink):
-    def __init__(self, retval: bool = True):
+    def __init__(self, retval: bool = True) -> None:
         self.called = False
         self.sessions: List[SMTPSession] = []
         self.proxy_datas: List[ProxyData] = []
@@ -363,7 +363,7 @@ class TestProxyTLV:
 
 class TestModule:
     class MockAsyncReader(AsyncReader):
-        def __init__(self, data: bytes, timeout: float = 0.4):
+        def __init__(self, data: bytes, timeout: float = 0.4) -> None:
             self.data = bytearray(data)
             self.timeout = 0.4
 

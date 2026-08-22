@@ -48,7 +48,7 @@ def reset_connection(client: SMTP_Client) -> None:
 
 
 class ReceivingHandler:
-    def __init__(self):
+    def __init__(self) -> None:
         self.box: List[Envelope] = []
 
     async def handle_DATA(

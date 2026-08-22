@@ -40,7 +40,7 @@ from .conftest import Global, AUTOSTOP_DELAY
 
 
 class SlowStartController(Controller):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         kwargs.setdefault("ready_timeout", 0.5)
         super().__init__(*args, **kwargs)
 
@@ -50,7 +50,7 @@ class SlowStartController(Controller):
 
 
 class SlowFactoryController(Controller):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         kwargs.setdefault("ready_timeout", 0.5)
         super().__init__(*args, **kwargs)
 

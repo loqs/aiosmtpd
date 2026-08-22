@@ -202,12 +202,12 @@ def dispatch_superclean() -> None:
 def get_opts(argv: list[str]) -> argparse.Namespace:
     # From: https://stackoverflow.com/a/49999185/149900
     class NoAction(argparse.Action):
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs) -> None:
             kwargs.setdefault("default", argparse.SUPPRESS)
             kwargs.setdefault("nargs", 0)
             super().__init__(**kwargs)
 
-        def __call__(self, *args, **kwargs):
+        def __call__(self, *args, **kwargs) -> None:
             pass
 
     dispers = {

@@ -37,7 +37,7 @@ MAIL_LOG = logging.getLogger("mail.log")
 
 
 class FromCliHandler:
-    def __init__(self, called: bool):
+    def __init__(self, called: bool) -> None:
         self.called = called
 
     @classmethod
