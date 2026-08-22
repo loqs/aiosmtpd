@@ -61,7 +61,7 @@ class FakeParser:
 
     message: Union[str, bytes, None] = None
 
-    def error(self, message: AnyStr):
+    def error(self, message: AnyStr) -> None:
         self.message = message
         raise SystemExit
 
@@ -95,7 +95,7 @@ class HELOHandler:
 
     async def handle_HELO(
         self, server: Server, session: ServerSession, envelope: Envelope, hostname: str
-    ):
+    ) -> str:
         return self.ReturnCode.to_str()
 
 
@@ -105,7 +105,7 @@ class EHLOHandlerDeprecated:
 
     async def handle_EHLO(
         self, server: Server, session: ServerSession, envelope: Envelope, hostname: str
-    ):
+    ) -> str:
         return self.ReturnCode.to_str()
 
 
@@ -125,7 +125,7 @@ class EHLOHandlerNew:
         envelope: Envelope,
         hostname: str,
         responses: List[str],
-    ):
+    ) -> List[str]:
         self.hostname = hostname
         self.orig_responses.clear()
         self.orig_responses.extend(responses)
@@ -138,7 +138,7 @@ class EHLOHandlerNew:
 class EHLOHandlerIncompatibleShort:
     async def handle_EHLO(
         self, server: Server, session: ServerSession, envelope: Envelope
-    ):
+    ) -> None:
         return
 
 
@@ -151,7 +151,7 @@ class EHLOHandlerIncompatibleLong:
         hostname: str,
         responses: List[str],
         xtra: str,
-    ):
+    ) -> None:
         return
 
 
@@ -166,7 +166,7 @@ class MAILHandler:
         envelope: Envelope,
         address: str,
         options: dict,
-    ):
+    ) -> str:
         envelope.mail_options = self.ReplacementOptions
         return self.ReturnCode.to_str()
 
@@ -181,7 +181,7 @@ class RCPTHandler:
         envelope: Envelope,
         address: str,
         options: dict,
-    ):
+    ) -> str:
         envelope.rcpt_options.extend(options)
         if address == "bart@example.com":
             return self.RejectCode.to_str()
@@ -194,14 +194,14 @@ class ErroringDataHandler:
 
     async def handle_DATA(
         self, server: Server, session: ServerSession, envelope: Envelope
-    ):
+    ) -> str:
         return self.ReturnCode.to_str()
 
 
 class AUTHHandler:
     async def handle_AUTH(
         self, server: Server, session: ServerSession, envelope: Envelope, args: List[str]
-    ):
+    ) -> str:
         server.authenticates = True
         return S.S235_AUTH_SUCCESS.to_str()
 
@@ -218,13 +218,13 @@ class DeprecatedHookController(Controller):
         def __init__(self, *args, **kws):
             super().__init__(*args, **kws)
 
-        async def ehlo_hook(self):
+        async def ehlo_hook(self) -> None:
             pass
 
-        async def rset_hook(self):
+        async def rset_hook(self) -> None:
             pass
 
-    def factory(self):
+    def factory(self) -> Server:
         self.smtpd = self.DeprecatedHookServer(self.handler)
         return self.smtpd
 
@@ -237,7 +237,7 @@ class DeprecatedHandler:
         rcpttos: List[str],
         data: AnyStr,
         **kws: AnyStr,
-    ):
+    ) -> None:
         pass
 
 
@@ -249,7 +249,7 @@ class AsyncDeprecatedHandler:
         rcpttos: List[str],
         data: AnyStr,
         **kws: AnyStr,
-    ):
+    ) -> None:
         pass
 
 
@@ -372,7 +372,7 @@ class TestDebugging:
     @controller_data(decode_data=True)
     def test_debugging(
         self, debugging_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         peer = client.sock.getsockname()
         client.sendmail(
             "anne@example.com",
@@ -407,7 +407,7 @@ class TestDebugging:
 
     def test_debugging_bytes(
         self, debugging_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         peer = client.sock.getsockname()
         client.sendmail(
             "anne@example.com",
@@ -442,7 +442,7 @@ class TestDebugging:
 
     def test_debugging_without_options(
         self, debugging_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         # Prevent ESMTP options.
         client.helo()
         peer = client.sock.getsockname()
@@ -477,7 +477,7 @@ class TestDebugging:
 
     def test_debugging_with_options(
         self, debugging_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         peer = client.sock.getsockname()
         client.sendmail(
             "anne@example.com",
@@ -522,7 +522,7 @@ class TestMessage:
         ],
         ids=["bytes", "bytearray", "str"]
     )
-    def test_prepare_message(self, temp_event_loop: asyncio.AbstractEventLoop, content: Union[bytes, bytearray, str]):
+    def test_prepare_message(self, temp_event_loop: asyncio.AbstractEventLoop, content: Union[bytes, bytearray, str]) -> None:
         sess_ = ServerSession(temp_event_loop)
         enve_ = Envelope()
         handler = MessageHandler()
@@ -547,7 +547,7 @@ class TestMessage:
         temp_event_loop: asyncio.AbstractEventLoop,
         content: Optional[Union[list, dict, tuple]],
         expectre: str,
-    ):
+    ) -> None:
         sess_ = ServerSession(temp_event_loop)
         enve_ = Envelope()
         handler = MessageHandler()
@@ -556,7 +556,7 @@ class TestMessage:
             _ = handler.prepare_message(sess_, enve_)
 
     @handler_data(class_=DataHandler)
-    def test_message(self, plain_controller: Controller, client: SMTPClient):
+    def test_message(self, plain_controller: Controller, client: SMTPClient) -> None:
         handler = plain_controller.handler
         assert isinstance(handler, DataHandler)
         # In this test, the message content comes in as a bytes.
@@ -582,7 +582,7 @@ class TestMessage:
     @handler_data(class_=DataHandler)
     def test_message_decoded(
         self, decoding_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         handler = decoding_controller.handler
         assert isinstance(handler, DataHandler)
         # In this test, the message content comes in as a string.
@@ -607,7 +607,7 @@ class TestMessage:
     @handler_data(class_=AsyncMessageHandler)
     def test_message_async(
         self, plain_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         handler = plain_controller.handler
         assert isinstance(handler, AsyncMessageHandler)
         # In this test, the message data comes in as bytes.
@@ -635,7 +635,7 @@ class TestMessage:
     @handler_data(class_=AsyncMessageHandler)
     def test_message_decoded_async(
         self, decoding_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         handler = decoding_controller.handler
         assert isinstance(handler, AsyncMessageHandler)
         # With a server that decodes the data, the messages come in as
@@ -670,7 +670,7 @@ class TestMailbox:
         temp_maildir: Path,
         mailbox_controller: Controller,
         client: SMTPClient,
-    ):
+    ) -> None:
         client.sendmail(
             "aperson@example.com",
             ["bperson@example.com"],
@@ -724,7 +724,7 @@ class TestMailbox:
         temp_maildir: Path,
         mailbox_controller: Controller,
         client: SMTPClient,
-    ):
+    ) -> None:
         client.sendmail(
             "aperson@example.com",
             ["bperson@example.com"],
@@ -745,56 +745,56 @@ class TestMailbox:
 
 
 class TestCLI:
-    def test_debugging_no_args(self, with_fake_parser: Callable):
+    def test_debugging_no_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Debugging)
         assert handler.exception is None
         assert handler.fparser.message is None
         assert handler.stream == sys.stdout
 
-    def test_debugging_two_args(self, with_fake_parser: Callable):
+    def test_debugging_two_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Debugging, "foo", "bar")
         assert handler.exception is SystemExit
         assert handler.fparser.message == "Debugging usage: [stdout|stderr]"
 
-    def test_debugging_stdout(self, with_fake_parser: Callable):
+    def test_debugging_stdout(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Debugging, "stdout")
         assert handler.exception is None
         assert handler.fparser.message is None
         assert handler.stream == sys.stdout
 
-    def test_debugging_stderr(self, with_fake_parser: Callable):
+    def test_debugging_stderr(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Debugging, "stderr")
         assert handler.exception is None
         assert handler.fparser.message is None
         assert handler.stream == sys.stderr
 
-    def test_debugging_bad_argument(self, with_fake_parser: Callable):
+    def test_debugging_bad_argument(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Debugging, "stdfoo")
         assert handler.exception is SystemExit
         assert handler.fparser.message == "Debugging usage: [stdout|stderr]"
 
-    def test_sink_no_args(self, with_fake_parser: Callable):
+    def test_sink_no_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Sink)
         assert handler.exception is None
         assert handler.fparser.message is None
         assert isinstance(handler, Sink)
 
-    def test_sink_any_args(self, with_fake_parser: Callable):
+    def test_sink_any_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Sink, "foo")
         assert handler.exception is SystemExit
         assert handler.fparser.message == "Sink handler does not accept arguments"
 
-    def test_mailbox_no_args(self, with_fake_parser: Callable):
+    def test_mailbox_no_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Mailbox)
         assert handler.exception is SystemExit
         assert handler.fparser.message == "The directory for the maildir is required"
 
-    def test_mailbox_too_many_args(self, with_fake_parser: Callable):
+    def test_mailbox_too_many_args(self, with_fake_parser: Callable) -> None:
         handler = with_fake_parser(Mailbox, "foo", "bar", "baz")
         assert handler.exception is SystemExit
         assert handler.fparser.message == "Too many arguments for Mailbox handler"
 
-    def test_mailbox(self, with_fake_parser: Callable, temp_maildir: Path):
+    def test_mailbox(self, with_fake_parser: Callable, temp_maildir: Path) -> None:
         handler = with_fake_parser(Mailbox, temp_maildir)
         assert handler.exception is None
         assert handler.fparser.message is None
@@ -831,7 +831,7 @@ class TestProxy:
 
     def test_deliver_bytes(
         self, proxy_nodecode_controller: Union[Controller, KnowsUpstream], client: SMTPClient
-    ):
+    ) -> None:
         client.sendmail(self.sender_addr, [self.receiver_addr], self.source)
         upstream = proxy_nodecode_controller.upstream
         upstream_handler = upstream.handler
@@ -843,7 +843,7 @@ class TestProxy:
 
     def test_deliver_str(
         self, proxy_decoding_controller: Union[Controller, KnowsUpstream], client: SMTPClient
-    ):
+    ) -> None:
         client.sendmail(self.sender_addr, [self.receiver_addr], self.source)
         upstream = proxy_decoding_controller.upstream
         upstream_handler = upstream.handler
@@ -867,7 +867,7 @@ class TestProxyMocked:
     )
 
     @pytest.fixture
-    def patch_smtp_refused(self, mocker: MockFixture):
+    def patch_smtp_refused(self, mocker: MockFixture) -> None:
         mock = mocker.patch("aiosmtpd.handlers.smtplib.SMTP")
         mock().sendmail.side_effect = SMTPRecipientsRefused(self.BAD_BART)
 
@@ -877,7 +877,7 @@ class TestProxyMocked:
         patch_smtp_refused: None,
         proxy_decoding_controller: Union[Controller, KnowsUpstream],
         client: SMTPClient,
-    ):
+    ) -> None:
         logger_name = "mail.debug"
         caplog.set_level(logging.INFO, logger=logger_name)
         client.sendmail("anne@example.com", ["bart@example.com"], self.SOURCE)
@@ -904,7 +904,7 @@ class TestProxyMocked:
         assert _l2 < _l1, "Log entries in wrong order"
 
     @pytest.fixture
-    def patch_smtp_oserror(self, mocker: MockFixture):
+    def patch_smtp_oserror(self, mocker: MockFixture) -> None:
         mock = mocker.patch("aiosmtpd.handlers.smtplib.SMTP")
         mock().sendmail.side_effect = OSError
 
@@ -914,7 +914,7 @@ class TestProxyMocked:
         patch_smtp_oserror: None,
         proxy_decoding_controller: Union[Controller, KnowsUpstream],
         client: SMTPClient,
-    ):
+    ) -> None:
         logger_name = "mail.debug"
         caplog.set_level(logging.INFO, logger=logger_name)
         client.sendmail("anne@example.com", ["bart@example.com"], self.SOURCE)
@@ -931,7 +931,7 @@ class TestProxyMocked:
 
 class TestHooks:
     @handler_data(class_=HELOHandler)
-    def test_hook_HELO(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_HELO(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, HELOHandler)
         resp = client.helo("me")
         assert resp == HELOHandler.ReturnCode
@@ -940,14 +940,14 @@ class TestHooks:
     @handler_data(class_=EHLOHandlerDeprecated)
     def test_hook_EHLO_deprecated(
         self, plain_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         assert isinstance(plain_controller.handler, EHLOHandlerDeprecated)
         code, mesg = client.ehlo("me")
         lines = mesg.decode("utf-8").splitlines()
         assert code == 250
         assert lines[-1] == EHLOHandlerDeprecated.Domain
 
-    def test_hook_EHLO_deprecated_warning(self):
+    def test_hook_EHLO_deprecated_warning(self) -> None:
         with pytest.warns(
             DeprecationWarning,
             match=(
@@ -963,7 +963,7 @@ class TestHooks:
         class_=EHLOHandlerNew,
         args_=("FEATURE1", "FEATURE2 OPTION", "FEAT3 OPTA OPTB"),
     )
-    def test_hook_EHLO_new(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_EHLO_new(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, EHLOHandlerNew)
         code, mesg = client.ehlo("me")
         lines = mesg.decode("utf-8").splitlines()
@@ -987,12 +987,12 @@ class TestHooks:
         [EHLOHandlerIncompatibleShort, EHLOHandlerIncompatibleLong],
         ids=["TooShort", "TooLong"],
     )
-    def test_hook_EHLO_incompat(self, handler_class: Type):
+    def test_hook_EHLO_incompat(self, handler_class: Type) -> None:
         with pytest.raises(RuntimeError, match="Unsupported EHLO Hook"):
             _ = Server(handler_class())
 
     @handler_data(class_=MAILHandler)
-    def test_hook_MAIL(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_MAIL(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller, Controller)
         handler = plain_controller.handler
         assert isinstance(handler, MAILHandler)
@@ -1003,7 +1003,7 @@ class TestHooks:
         assert smtpd.envelope.mail_options == MAILHandler.ReplacementOptions
 
     @handler_data(class_=RCPTHandler)
-    def test_hook_RCPT(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_RCPT(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, RCPTHandler)
         client.helo("me")
         with pytest.raises(SMTPRecipientsRefused) as excinfo:
@@ -1024,7 +1024,7 @@ class TestHooks:
         }
 
     @handler_data(class_=ErroringDataHandler)
-    def test_hook_DATA(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_DATA(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, ErroringDataHandler)
         with pytest.raises(SMTPDataError) as excinfo:
             client.sendmail(
@@ -1046,14 +1046,14 @@ class TestHooks:
 
     @controller_data(decode_data=True, auth_require_tls=False)
     @handler_data(class_=AUTHHandler)
-    def test_hook_AUTH(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_AUTH(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, AUTHHandler)
         client.ehlo("me")
         resp = client.login("test", "test")
         assert resp == S.S235_AUTH_SUCCESS
 
     @handler_data(class_=NoHooksHandler)
-    def test_hook_NoHooks(self, plain_controller: Controller, client: SMTPClient):
+    def test_hook_NoHooks(self, plain_controller: Controller, client: SMTPClient) -> None:
         assert isinstance(plain_controller.handler, NoHooksHandler)
         client.helo("me")
         client.mail("anne@example.com")
@@ -1091,7 +1091,7 @@ class TestDeprecation:
             )
 
     @handler_data(class_=DeprecatedHandler)
-    def test_process_message(self, plain_controller: Controller, client: SMTPClient):
+    def test_process_message(self, plain_controller: Controller, client: SMTPClient) -> None:
         """handler.process_message is Deprecated"""
         handler = plain_controller.handler
         assert isinstance(handler, DeprecatedHandler)
@@ -1101,7 +1101,7 @@ class TestDeprecation:
     @handler_data(class_=AsyncDeprecatedHandler)
     def test_process_message_async(
         self, plain_controller: Controller, client: SMTPClient
-    ):
+    ) -> None:
         """handler.process_message is Deprecated"""
         handler = plain_controller.handler
         assert isinstance(handler, AsyncDeprecatedHandler)
@@ -1109,14 +1109,14 @@ class TestDeprecation:
         self._process_message_testing(controller, client)
 
     @controller_data(class_=DeprecatedHookController)
-    def test_ehlo_hook(self, plain_controller: Controller, client: SMTPClient):
+    def test_ehlo_hook(self, plain_controller: Controller, client: SMTPClient) -> None:
         """SMTP.ehlo_hook is Deprecated"""
         expectedre = r"Use handler.handle_EHLO\(\) instead of .ehlo_hook\(\)"
         with pytest.warns(DeprecationWarning, match=expectedre):
             client.ehlo("example.com")
 
     @controller_data(class_=DeprecatedHookController)
-    def test_rset_hook(self, plain_controller: Controller, client: SMTPClient):
+    def test_rset_hook(self, plain_controller: Controller, client: SMTPClient) -> None:
         """SMTP.rset_hook is Deprecated"""
         expectedre = r"Use handler.handle_RSET\(\) instead of .rset_hook\(\)"
         with pytest.warns(DeprecationWarning, match=expectedre):

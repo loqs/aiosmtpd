@@ -12,13 +12,14 @@ import pytest
 from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Sink
 from aiosmtpd.lmtp import LMTP
+from aiosmtpd.smtp import SMTP as Server
 from aiosmtpd.testing.statuscodes import SMTP_STATUS_CODES as S
 
 from .conftest import Global
 
 
 class LMTPController(Controller):
-    def factory(self):
+    def factory(self) -> Server:
         self.smtpd = LMTP(self.handler)
         return self.smtpd
 
@@ -34,7 +35,7 @@ def lmtp_controller() -> Generator[LMTPController, None, None]:
     controller.stop()
 
 
-def test_lhlo(client: SMTPClient):
+def test_lhlo(client: SMTPClient) -> None:
     code, mesg = client.docmd("LHLO example.com")
     lines = mesg.splitlines()
     assert lines == [
@@ -46,19 +47,19 @@ def test_lhlo(client: SMTPClient):
     assert code == 250
 
 
-def test_helo(client: SMTPClient):
+def test_helo(client: SMTPClient) -> None:
     # HELO and EHLO are not valid LMTP commands.
     resp = client.helo("example.com")
     assert resp == S.S500_CMD_UNRECOG(b"HELO")
 
 
-def test_ehlo(client: SMTPClient):
+def test_ehlo(client: SMTPClient) -> None:
     # HELO and EHLO are not valid LMTP commands.
     resp = client.ehlo("example.com")
     assert resp == S.S500_CMD_UNRECOG(b"EHLO")
 
 
-def test_help(client: SMTPClient):
+def test_help(client: SMTPClient) -> None:
     # https://github.com/aio-libs/aiosmtpd/issues/113
     resp = client.docmd("HELP")
     assert resp == S.S250_SUPPCMD_LMTP
