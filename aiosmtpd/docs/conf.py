@@ -151,6 +151,8 @@ rst_prolog = f"""
 .. |copyright| replace:: {copyright}
 """
 
+nitpicky = True
+
 # Ignore the following broken references
 nitpick_ignore = [
     ('py:class', '_Missing'),
