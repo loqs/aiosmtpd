@@ -4,6 +4,7 @@
 """Test the LMTP protocol."""
 
 import socket
+from smtplib import SMTP as SMTPClient
 from typing import Generator
 
 import pytest
@@ -33,7 +34,7 @@ def lmtp_controller() -> Generator[LMTPController, None, None]:
     controller.stop()
 
 
-def test_lhlo(client):
+def test_lhlo(client: SMTPClient):
     code, mesg = client.docmd("LHLO example.com")
     lines = mesg.splitlines()
     assert lines == [
@@ -45,19 +46,19 @@ def test_lhlo(client):
     assert code == 250
 
 
-def test_helo(client):
+def test_helo(client: SMTPClient):
     # HELO and EHLO are not valid LMTP commands.
     resp = client.helo("example.com")
     assert resp == S.S500_CMD_UNRECOG(b"HELO")
 
 
-def test_ehlo(client):
+def test_ehlo(client: SMTPClient):
     # HELO and EHLO are not valid LMTP commands.
     resp = client.ehlo("example.com")
     assert resp == S.S500_CMD_UNRECOG(b"EHLO")
 
 
-def test_help(client):
+def test_help(client: SMTPClient):
     # https://github.com/aio-libs/aiosmtpd/issues/113
     resp = client.docmd("HELP")
     assert resp == S.S250_SUPPCMD_LMTP

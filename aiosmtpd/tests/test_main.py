@@ -7,11 +7,12 @@ import multiprocessing as MP
 import os
 import sys
 import time
+from argparse import ArgumentParser
 from contextlib import contextmanager
 from multiprocessing.synchronize import Event as MP_Event
 from smtplib import SMTP as SMTPClient
 from smtplib import SMTP_SSL
-from typing import Generator
+from typing import Callable, Generator, Tuple
 
 import pytest
 from pytest_mock import MockFixture
@@ -40,7 +41,7 @@ class FromCliHandler:
         self.called = called
 
     @classmethod
-    def from_cli(cls, parser, *args):
+    def from_cli(cls, parser: ArgumentParser, *args: str):
         return cls(*args)
 
 
@@ -122,7 +123,7 @@ def main_n(*args):
 
 
 @contextmanager
-def watcher_process(func):
+def watcher_process(func: Callable):
     redy = MP.Event()
     retq = MP.Queue()
     proc = MP.Process(target=func, args=(redy, retq))
@@ -137,12 +138,14 @@ def watcher_process(func):
 
 @pytest.mark.usefixtures("autostop_loop")
 class TestMain:
-    def test_setuid(self, nobody_uid, mocker):
+    def test_setuid(self, nobody_uid: int, mocker: MockFixture):
         mock = mocker.patch("os.setuid")
         main(args=())
         mock.assert_called_with(nobody_uid)
 
-    def test_setuid_permission_error(self, nobody_uid, mocker, capsys):
+    def test_setuid_permission_error(
+        self, nobody_uid: int, mocker: MockFixture, capsys: pytest.CaptureFixture[str]
+    ):
         mock = mocker.patch("os.setuid", side_effect=PermissionError)
         with pytest.raises(SystemExit) as excinfo:
             main(args=())
@@ -153,18 +156,20 @@ class TestMain:
             == 'Cannot setuid "nobody"; try running with -n option.\n'
         )
 
-    def test_setuid_no_pwd_module(self, nobody_uid, mocker, capsys):
+    def test_setuid_no_pwd_module(
+        self, nobody_uid: int, mocker: MockFixture, capsys: pytest.CaptureFixture[str]
+    ):
         mocker.patch("aiosmtpd.main.pwd", None)
         with pytest.raises(SystemExit) as excinfo:
             main(args=())
         assert excinfo.value.code == 1
         assert capsys.readouterr().err == 'Cannot import module "pwd"; try running with -n option.\n'
 
-    def test_n(self, setuid):
+    def test_n(self, setuid: None):
         with pytest.raises(RuntimeError):
             main_n()
 
-    def test_nosetuid(self, setuid):
+    def test_nosetuid(self, setuid: None):
         with pytest.raises(RuntimeError):
             main(("--nosetuid",))
 
@@ -191,7 +196,12 @@ class TestMain:
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="No idea why these are failing")
 class TestMainByWatcher:
-    def test_tls(self, temp_event_loop, tls_cert_pem_path, tls_key_pem_path):
+    def test_tls(
+        self,
+        temp_event_loop: asyncio.AbstractEventLoop,
+        tls_cert_pem_path: str,
+        tls_key_pem_path: str,
+    ):
         with watcher_process(watch_for_tls) as retq:
             temp_event_loop.call_later(AUTOSTOP_DELAY, temp_event_loop.stop)
             main_n("--tlscert", tls_cert_pem_path, "--tlskey", tls_key_pem_path)
@@ -201,7 +211,12 @@ class TestMainByWatcher:
         require_tls = retq.get()
         assert require_tls is True
 
-    def test_tls_noreq(self, temp_event_loop, tls_cert_pem_path, tls_key_pem_path):
+    def test_tls_noreq(
+        self,
+        temp_event_loop: asyncio.AbstractEventLoop,
+        tls_cert_pem_path: str,
+        tls_key_pem_path: str,
+    ):
         with watcher_process(watch_for_tls) as retq:
             temp_event_loop.call_later(AUTOSTOP_DELAY, temp_event_loop.stop)
             main_n(
@@ -217,7 +232,12 @@ class TestMainByWatcher:
         require_tls = retq.get()
         assert require_tls is False
 
-    def test_smtps(self, temp_event_loop, tls_cert_pem_path, tls_key_pem_path):
+    def test_smtps(
+        self,
+        temp_event_loop: asyncio.AbstractEventLoop,
+        tls_cert_pem_path: str,
+        tls_key_pem_path: str,
+    ):
         with watcher_process(watch_for_smtps) as retq:
             temp_event_loop.call_later(AUTOSTOP_DELAY, temp_event_loop.stop)
             main_n("--smtpscert", tls_cert_pem_path, "--smtpskey", tls_key_pem_path)
@@ -260,7 +280,7 @@ class TestParseArgs:
         with pytest.raises(TypeError):
             parseargs(("-c", "aiosmtpd.tests.test_main.FromCliHandler", "FOO", "BAR"))
 
-    def test_handler_no_from_cli_exception(self, capsys):
+    def test_handler_no_from_cli_exception(self, capsys: pytest.CaptureFixture[str]):
         with pytest.raises(SystemExit) as excinfo:
             parseargs(("-c", "aiosmtpd.tests.test_main.NullHandler", "FOO", "BAR"))
         assert excinfo.value.code == 2
@@ -280,19 +300,19 @@ class TestParseArgs:
             (("-l", "::0:25"), "::0", 25),
         ],
     )
-    def test_host_port(self, args, exp_host, exp_port):
+    def test_host_port(self, args: Tuple, exp_host: str, exp_port: int):
         parser, args_ = parseargs(args=args)
         assert args_.host == exp_host
         assert args_.port == exp_port
 
-    def test_bad_port_number(self, capsys):
+    def test_bad_port_number(self, capsys: pytest.CaptureFixture[str]):
         with pytest.raises(SystemExit) as excinfo:
             parseargs(("-l", ":foo"))
         assert excinfo.value.code == 2
         assert "Invalid port number: foo" in capsys.readouterr().err
 
     @pytest.mark.parametrize("opt", ["--version", "-v"])
-    def test_version(self, capsys, mocker, opt):
+    def test_version(self, capsys: pytest.CaptureFixture[str], mocker: MockFixture, opt: str):
         mocker.patch("aiosmtpd.main.PROGRAM", "smtpd")
         with pytest.raises(SystemExit) as excinfo:
             parseargs((opt,))
@@ -300,7 +320,7 @@ class TestParseArgs:
         assert capsys.readouterr().out == f"smtpd {__version__}\n"
 
     @pytest.mark.parametrize("args", [("--smtpscert", "x"), ("--smtpskey", "x")])
-    def test_smtps(self, capsys, mocker, args):
+    def test_smtps(self, capsys: pytest.CaptureFixture[str], mocker: MockFixture, args: Tuple):
         mocker.patch("aiosmtpd.main.PROGRAM", "smtpd")
         with pytest.raises(SystemExit) as exc:
             parseargs(args)
@@ -311,7 +331,7 @@ class TestParseArgs:
         )
 
     @pytest.mark.parametrize("args", [("--tlscert", "x"), ("--tlskey", "x")])
-    def test_tls(self, capsys, mocker, args):
+    def test_tls(self, capsys: pytest.CaptureFixture[str], mocker: MockFixture, args: Tuple):
         mocker.patch("aiosmtpd.main.PROGRAM", "smtpd")
         with pytest.raises(SystemExit) as exc:
             parseargs(args)
@@ -321,7 +341,7 @@ class TestParseArgs:
             in capsys.readouterr().err
         )
 
-    def test_norequiretls(self, capsys, mocker):
+    def test_norequiretls(self, capsys: pytest.CaptureFixture[str], mocker: MockFixture):
         mocker.patch("aiosmtpd.main.PROGRAM", "smtpd")
         parser, args = parseargs(("--no-requiretls",))
         assert args.requiretls is False
@@ -336,7 +356,16 @@ class TestParseArgs:
         ids=["x-x", "cert-x", "x-key"],
     )
     @pytest.mark.parametrize("meth", ["smtps", "tls"])
-    def test_ssl_files_err(self, capsys, mocker, meth, certfile_present, keyfile_present, expect, request):
+    def test_ssl_files_err(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        mocker: MockFixture,
+        meth: str,
+        certfile_present: bool,
+        keyfile_present: bool,
+        expect: str,
+        request: pytest.FixtureRequest,
+    ):
         certfile = request.getfixturevalue("tls_cert_pem_path") if certfile_present else "x"
         keyfile = request.getfixturevalue("tls_key_pem_path") if keyfile_present else "x"
         mocker.patch("aiosmtpd.main.PROGRAM", "smtpd")
@@ -347,7 +376,7 @@ class TestParseArgs:
 
 
 class TestSigint:
-    def test_keyboard_interrupt(self, temp_event_loop):
+    def test_keyboard_interrupt(self, temp_event_loop: asyncio.AbstractEventLoop):
         """main() must close loop gracefully on KeyboardInterrupt."""
 
         def interrupt():

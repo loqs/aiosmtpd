@@ -126,7 +126,7 @@ def move_prof(verbose: bool = False):
         print(flush=True)
 
 
-def pycache_clean(verbose=False):
+def pycache_clean(verbose: bool = False):
     """Cleanup __pycache__ dirs & bytecode files (if any)"""
     aiosmtpdpath = Path(".")
     for i, f in enumerate(aiosmtpdpath.rglob("*.py[co]"), start=1):
@@ -199,7 +199,7 @@ def dispatch_superclean():
 # endregion
 
 
-def get_opts(argv):
+def get_opts(argv: list[str]):
     # From: https://stackoverflow.com/a/49999185/149900
     class NoAction(argparse.Action):
         def __init__(self, **kwargs):

@@ -15,11 +15,12 @@ from functools import partial
 from ipaddress import IPv4Address, IPv6Address
 from smtplib import SMTP as SMTPClient
 from smtplib import SMTPServerDisconnected
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import pytest
 from pytest_mock import MockFixture
 
+from aiosmtpd.controller import Controller
 from aiosmtpd.handlers import Sink
 from aiosmtpd.proxy_protocol import (
     V2_CMD,
@@ -362,7 +363,7 @@ class TestProxyTLV:
 
 class TestModule:
     class MockAsyncReader(AsyncReader):
-        def __init__(self, data, timeout=0.4):
+        def __init__(self, data: bytes, timeout: float = 0.4):
             self.data = bytearray(data)
             self.timeout = 0.4
 
@@ -450,24 +451,24 @@ class TestModule:
 
 class TestSMTPInit:
     @parametrize("value", [int(-1), float(-1.0), int(0), float(0.0)])
-    def test_value_error(self, temp_event_loop, value):
+    def test_value_error(self, temp_event_loop: asyncio.AbstractEventLoop, value: Union[int, float]):
         with pytest.raises(ValueError, match=r"proxy_protocol_timeout must be > 0"):
             _ = SMTPServer(Sink(), proxy_protocol_timeout=value, loop=temp_event_loop)
 
-    def test_lt_3(self, caplog, temp_event_loop):
+    def test_lt_3(self, caplog: pytest.LogCaptureFixture, temp_event_loop: asyncio.AbstractEventLoop):
         _ = SMTPServer(Sink(), proxy_protocol_timeout=1, loop=temp_event_loop)
         expect = ("mail.log", logging.WARNING, "proxy_protocol_timeout < 3.0")
         assert expect in caplog.record_tuples
 
     @parametrize("value", [int(3), float(3.0), int(4), float(4.0)])
-    def test_ge_3(self, caplog, temp_event_loop, value):
+    def test_ge_3(self, caplog: pytest.LogCaptureFixture, temp_event_loop: asyncio.AbstractEventLoop, value: Union[int, float]):
         _ = SMTPServer(Sink(), proxy_protocol_timeout=value, loop=temp_event_loop)
         expect = ("mail.log", logging.WARNING, "proxy_protocol_timeout < 3.0")
         assert expect not in caplog.record_tuples
 
 
 class TestGetV1(_TestProxyProtocolCommon):
-    def test_noproxy(self, setup_proxy_protocol):
+    def test_noproxy(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         data = b"HELO example.org\r\n"
         self.protocol.data_received(data)
@@ -486,7 +487,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         handler = self.protocol.event_handler
         assert handler.called
 
-    def _assert_valid(self, af, proto, srcip, dstip, srcport, dstport, testline):
+    def _assert_valid(self, af: AF, proto: PROTO, srcip: str, dstip: str, srcport: int, dstport: int, testline: str):
         self.protocol.data_received(testline.encode("ascii"))
         self.runner()
         assert self.protocol.session.proxy_data.error == ""
@@ -505,7 +506,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             dst_port=dstport,
         )
 
-    def test_tcp4(self, setup_proxy_protocol):
+    def test_tcp4(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.4"
         dstip = "5.6.7.8"
         srcport = 0
@@ -516,7 +517,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             AF.INET, PROTO.STREAM, srcip, dstip, srcport, dstport, prox_test
         )
 
-    def test_tcp4_random(self, setup_proxy_protocol):
+    def test_tcp4_random(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         srcip = ".".join(f"{random.getrandbits(8)}" for _ in range(0, 4))
         dstip = ".".join(f"{random.getrandbits(8)}" for _ in range(0, 4))
@@ -527,7 +528,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             AF.INET, PROTO.STREAM, srcip, dstip, srcport, dstport, prox_test
         )
 
-    def test_tcp6_shortened(self, setup_proxy_protocol):
+    def test_tcp6_shortened(self, setup_proxy_protocol: Callable):
         srcip = "2020:dead::0001"
         dstip = "2021:cafe::0002"
         srcport = 8000
@@ -538,7 +539,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             AF.INET6, PROTO.STREAM, srcip, dstip, srcport, dstport, prox_test
         )
 
-    def test_tcp6_random(self, setup_proxy_protocol):
+    def test_tcp6_random(self, setup_proxy_protocol: Callable):
         srcip = ":".join(f"{random.getrandbits(16):04x}" for _ in range(0, 8))
         dstip = ":".join(f"{random.getrandbits(16):04x}" for _ in range(0, 8))
         srcport = random_port()
@@ -549,7 +550,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             AF.INET6, PROTO.STREAM, srcip, dstip, srcport, dstport, prox_test
         )
 
-    def test_unknown(self, setup_proxy_protocol):
+    def test_unknown(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY UNKNOWN whatever\r\n"
         setup_proxy_protocol(self)
         self.protocol.data_received(prox_test.encode("ascii"))
@@ -565,7 +566,7 @@ class TestGetV1(_TestProxyProtocolCommon):
             rest=b" whatever",
         )
 
-    def test_unknown_short(self, setup_proxy_protocol):
+    def test_unknown_short(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY UNKNOWN\r\n"
         setup_proxy_protocol(self)
         self.protocol.data_received(prox_test.encode("ascii"))
@@ -590,12 +591,12 @@ class TestGetV1(_TestProxyProtocolCommon):
         assert self.transport.close.called
         assert self.protocol.session.proxy_data.error == expect_err
 
-    def test_invalid_sig(self, setup_proxy_protocol):
+    def test_invalid_sig(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY1 UNKNOWN whatevs\r\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 wrong signature")
 
-    def test_unsupported_family(self, setup_proxy_protocol):
+    def test_unsupported_family(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY TCP5 123.123.123.123 231.231.231.231 80 90\r\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 unrecognized family")
@@ -603,22 +604,22 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 unrecognized family")
 
-    def test_unsupported_proto(self, setup_proxy_protocol):
+    def test_unsupported_proto(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY UDP4 123.123.123.123 231.231.231.231 80 90\r\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 unrecognized protocol")
 
-    def test_too_long(self, setup_proxy_protocol):
+    def test_too_long(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY UNKNOWN " + "*" * 100 + "\r\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 header too long")
 
-    def test_malformed_nocr(self, setup_proxy_protocol):
+    def test_malformed_nocr(self, setup_proxy_protocol: Callable):
         prox_test = "PROXY UNKNOWN\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 malformed")
 
-    def test_malformed_notproxy(self, setup_proxy_protocol):
+    def test_malformed_notproxy(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.4"
         dstip = "5.6.7.8"
         srcport = 65535
@@ -627,7 +628,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXY unrecognized signature")
 
-    def test_malformed_wrongtype_64(self, setup_proxy_protocol):
+    def test_malformed_wrongtype_64(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.4"
         dstip = "5.6.7.8"
         srcport = 65535
@@ -636,7 +637,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 address not IPv6")
 
-    def test_malformed_wrongtype_46(self, setup_proxy_protocol):
+    def test_malformed_wrongtype_46(self, setup_proxy_protocol: Callable):
         srcip = "2020:dead::0001"
         dstip = "2021:cafe::0002"
         srcport = 65535
@@ -645,7 +646,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 address not IPv4")
 
-    def test_malformed_wrongtype_6mixed(self, setup_proxy_protocol):
+    def test_malformed_wrongtype_6mixed(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.4"
         dstip = "2021:cafe::0002"
         srcport = 65535
@@ -670,7 +671,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         ],
     )
     def test_malformed_addr(
-        self, setup_proxy_protocol, srcip, dstip, srcport, dstport, whatwrong
+        self, setup_proxy_protocol: Callable, srcip: str, dstip: str, srcport: Optional[int], dstport: Optional[int], whatwrong: str
     ):
         if srcport is None:
             srcport = random_port()
@@ -687,12 +688,12 @@ class TestGetV1(_TestProxyProtocolCommon):
             param(" text", id="sptext"),
         ],
     )
-    def test_extra(self, setup_proxy_protocol, extra):
+    def test_extra(self, setup_proxy_protocol: Callable, extra: str):
         prox_test = f"PROXY TCP6 {self.IP6_dead} {self.IP6_cafe} 0 25{extra}\r\n"
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 unrecognized extraneous data")
 
-    def test_malformed_addr4(self, setup_proxy_protocol):
+    def test_malformed_addr4(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.a"
         dstip = "5.6.7.8"
         srcport = 65535
@@ -701,7 +702,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 address malformed")
 
-    def test_ports_oob(self, setup_proxy_protocol):
+    def test_ports_oob(self, setup_proxy_protocol: Callable):
         srcip = "1.2.3.4"
         dstip = "5.6.7.8"
         srcport = 65536
@@ -710,7 +711,7 @@ class TestGetV1(_TestProxyProtocolCommon):
         setup_proxy_protocol(self)
         self._assert_invalid(prox_test, "PROXYv1 src port out of bounds")
 
-    def test_portd_oob(self, setup_proxy_protocol):
+    def test_portd_oob(self, setup_proxy_protocol: Callable):
         srcip = "2020:dead::0001"
         dstip = "2021:cafe::0002"
         srcport = 10000
@@ -721,7 +722,7 @@ class TestGetV1(_TestProxyProtocolCommon):
 
 
 class TestGetV2(_TestProxyProtocolCommon):
-    def test_1(self, setup_proxy_protocol):
+    def test_1(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         self.protocol.data_received(TEST_V2_DATA1_XTRA)
         self.runner()
@@ -772,13 +773,13 @@ class TestGetV2(_TestProxyProtocolCommon):
         assert handler.called
         return handler.proxy_datas[-1]
 
-    def test_UNSPEC_empty(self, setup_proxy_protocol):
+    def test_UNSPEC_empty(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         assert self._send_valid(
             V2_CMD.LOCAL, AF.UNSPEC, PROTO.UNSPEC, b""
         ).same_attribs(valid=True, version=2, command=0, family=0, protocol=0, rest=b"")
 
-    def test_UNSPEC_notempty(self, setup_proxy_protocol):
+    def test_UNSPEC_notempty(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         payload = b"asdfghjkl"
         assert self._send_valid(
@@ -789,7 +790,7 @@ class TestGetV2(_TestProxyProtocolCommon):
 
     @parametrize("ttlv", [b"", b"fake_tlv"])
     @parametrize("tproto", [PROTO.STREAM, PROTO.DGRAM])
-    def test_INET4(self, setup_proxy_protocol, tproto, ttlv):
+    def test_INET4(self, setup_proxy_protocol: Callable, tproto: PROTO, ttlv: bytes):
         setup_proxy_protocol(self)
         src_addr = IPv4Address("10.212.4.33")
         dst_addr = IPv4Address("10.11.12.13")
@@ -819,7 +820,7 @@ class TestGetV2(_TestProxyProtocolCommon):
 
     @parametrize("ttlv", [b"", b"fake_tlv"])
     @parametrize("tproto", [PROTO.STREAM, PROTO.DGRAM])
-    def test_INET6(self, setup_proxy_protocol, tproto, ttlv):
+    def test_INET6(self, setup_proxy_protocol: Callable, tproto: PROTO, ttlv: bytes):
         setup_proxy_protocol(self)
         src_addr = IPv6Address("2020:dead::0001")
         dst_addr = IPv6Address("2021:cafe::0022")
@@ -849,7 +850,7 @@ class TestGetV2(_TestProxyProtocolCommon):
 
     @parametrize("ttlv", [b"", b"fake_tlv"])
     @parametrize("tproto", [PROTO.STREAM, PROTO.DGRAM])
-    def test_UNIX(self, setup_proxy_protocol, tproto, ttlv):
+    def test_UNIX(self, setup_proxy_protocol: Callable, tproto: PROTO, ttlv: bytes):
         setup_proxy_protocol(self)
         src_addr = struct.pack("108s", b"/proc/source")
         dst_addr = struct.pack("108s", b"/proc/dest")
@@ -879,7 +880,7 @@ class TestGetV2(_TestProxyProtocolCommon):
             (AF.UNIX, PROTO.UNSPEC),
         ],
     )
-    def test_fallback_UNSPEC(self, setup_proxy_protocol, tfam, tproto):
+    def test_fallback_UNSPEC(self, setup_proxy_protocol: Callable, tfam: AF, tproto: PROTO):
         setup_proxy_protocol(self)
         payload = b"whatever"
         assert self._send_valid(V2_CMD.LOCAL, tfam, tproto, payload).same_attribs(
@@ -922,7 +923,7 @@ class TestGetV2(_TestProxyProtocolCommon):
             assert self.protocol.session.proxy_data.error == expect
         return self.protocol.session.proxy_data
 
-    def test_invalid_sig(self, setup_proxy_protocol):
+    def test_invalid_sig(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         ERRSIG = b"\r\n\r\n\x00\r\nQUIP\n"
         self._send_invalid(sig=ERRSIG, expect="PROXYv2 wrong signature")
@@ -942,23 +943,23 @@ class TestGetV2(_TestProxyProtocolCommon):
     #     assert not sess.proxy_data.valid
     #     assert sess.proxy_data.error == "PROXYv2 malformed header"
 
-    def test_illegal_ver(self, setup_proxy_protocol):
+    def test_illegal_ver(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         self._send_invalid(ver=3, expect="PROXYv2 illegal version")
 
-    def test_unsupported_cmd(self, setup_proxy_protocol):
+    def test_unsupported_cmd(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         self._send_invalid(cmd=2, expect="PROXYv2 unsupported command")
 
-    def test_unsupported_fam(self, setup_proxy_protocol):
+    def test_unsupported_fam(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         self._send_invalid(fam=4, expect="PROXYv2 unsupported family")
 
-    def test_unsupported_proto(self, setup_proxy_protocol):
+    def test_unsupported_proto(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         self._send_invalid(proto=3, expect="PROXYv2 unsupported protocol")
 
-    def test_wrong_proto_6shouldbe4(self, setup_proxy_protocol):
+    def test_wrong_proto_6shouldbe4(self, setup_proxy_protocol: Callable):
         setup_proxy_protocol(self)
         src_addr = IPv4Address("192.168.0.11")
         dst_addr = IPv4Address("172.16.0.22")
@@ -992,12 +993,12 @@ class TestWithController:
                 assert code == 221
 
     @parametrize("handshake", HANDSHAKES.values(), ids=HANDSHAKES.keys())
-    def test_okay(self, plain_controller, handshake):
+    def test_okay(self, plain_controller: Controller, handshake: bytes):
         assert plain_controller.smtpd._proxy_timeout > 0.0
         self._okay(handshake)
 
     @parametrize("handshake", HANDSHAKES.values(), ids=HANDSHAKES.keys())
-    def test_hiccup(self, plain_controller, handshake):
+    def test_hiccup(self, plain_controller: Controller, handshake: bytes):
         assert plain_controller.smtpd._proxy_timeout > 0.0
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(Global.SrvAddr)
@@ -1014,7 +1015,7 @@ class TestWithController:
                 assert code == 221
 
     @parametrize("handshake", HANDSHAKES.values(), ids=HANDSHAKES.keys())
-    def test_timeout(self, plain_controller, handshake):
+    def test_timeout(self, plain_controller: Controller, handshake: bytes):
         assert plain_controller.smtpd._proxy_timeout > 0.0
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(Global.SrvAddr)
@@ -1050,7 +1051,7 @@ class TestWithController:
         self._okay(handshake)
 
     @parametrize("handshake", HANDSHAKES.values(), ids=HANDSHAKES.keys())
-    def test_incomplete(self, plain_controller, handshake):
+    def test_incomplete(self, plain_controller: Controller, handshake: bytes):
         assert plain_controller.smtpd._proxy_timeout > 0.0
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(Global.SrvAddr)
@@ -1100,7 +1101,7 @@ class TestHandlerAcceptReject:
         ],
         ids=["v1", "v2"],
     )
-    def test_simple(self, plain_controller, handshake, handler_retval):
+    def test_simple(self, plain_controller: Controller, handshake: bytes, handler_retval: bool):
         assert plain_controller.smtpd._proxy_timeout > 0.0
         assert isinstance(plain_controller.handler, ProxyPeekerHandler)
         plain_controller.handler.retval = handler_retval

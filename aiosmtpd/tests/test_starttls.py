@@ -4,7 +4,7 @@
 import ssl
 from contextlib import suppress
 from email.mime.text import MIMEText
-from smtplib import SMTPServerDisconnected
+from smtplib import SMTP as SMTPClient, SMTPServerDisconnected
 from typing import Callable, Generator
 
 import pytest
@@ -125,7 +125,7 @@ def auth_req_tls_controller(
 
 
 class TestNoTLS:
-    def test_disabled_tls(self, plain_controller, client):
+    def test_disabled_tls(self, plain_controller: Controller, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.docmd("STARTTLS")
@@ -134,16 +134,16 @@ class TestNoTLS:
 
 @pytest.mark.usefixtures("tls_controller")
 class TestStartTLS:
-    def test_help_starttls(self, tls_controller, client):
+    def test_help_starttls(self, tls_controller: Controller, client: SMTPClient):
         resp = client.docmd("HELP STARTTLS")
         assert resp == S.S250_SYNTAX_STARTTLS
 
-    def test_starttls_arg(self, tls_controller, client):
+    def test_starttls_arg(self, tls_controller: Controller, client: SMTPClient):
         resp = client.docmd("STARTTLS arg")
         assert resp == S.S501_SYNTAX_STARTTLS
 
     @handler_data(class_=ReceivingHandler)
-    def test_starttls(self, tls_controller, client):
+    def test_starttls(self, tls_controller: Controller, client: SMTPClient):
         sender = "sender@example.com"
         recipients = ["rcpt1@example.com"]
         code, _ = client.ehlo("example.com")
@@ -157,7 +157,7 @@ class TestStartTLS:
         assert handler.box[0].mail_from == sender
         assert handler.box[0].rcpt_tos == recipients
 
-    def test_starttls_quit(self, tls_controller, client):
+    def test_starttls_quit(self, tls_controller: Controller, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.starttls()
@@ -167,7 +167,7 @@ class TestStartTLS:
         client.close()
 
     @handler_data(class_=HandshakeFailingHandler)
-    def test_failed_handshake(self, client):
+    def test_failed_handshake(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.starttls()
@@ -177,24 +177,26 @@ class TestStartTLS:
         resp = client.rcpt("rcpt@example.com")
         assert resp == S.S554_LACK_SECURITY
 
-    def test_tls_handshake_stopcontroller(self, tls_controller, client):
+    def test_tls_handshake_stopcontroller(
+        self, tls_controller: Controller, client: SMTPClient
+    ):
         client.ehlo("example.com")
         code, response = client.docmd("STARTTLS")
         tls_controller.stop()
         with pytest.raises(SMTPServerDisconnected):
             client.quit()
 
-    def test_tls_bad_syntax(self, client):
+    def test_tls_bad_syntax(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.docmd("STARTTLS", "TRUE")
         assert resp == S.S501_SYNTAX_STARTTLS
 
-    def test_help_after_starttls(self, client):
+    def test_help_after_starttls(self, client: SMTPClient):
         resp = client.docmd("HELP")
         assert resp == S.S250_SUPPCMD_TLS
 
-    def test_helo_starttls(self, tls_controller, client):
+    def test_helo_starttls(self, tls_controller: Controller, client: SMTPClient):
         resp = client.helo("example.com")
         assert resp == S.S250_FQDN
         # Entering portion of code where hang is possible (upon assertion fail), so
@@ -216,7 +218,7 @@ class ExceptionCaptureHandler:
 
 class TestTLSEnding:
     @handler_data(class_=EOFingHandler)
-    def test_eof_received(self, tls_controller, client):
+    def test_eof_received(self, tls_controller: Controller, client: SMTPClient):
         # I don't like this. It's too intimately involved with the innards of the SMTP
         # class. But for the life of me, I can't figure out why coverage there fail
         # intermittently.
@@ -245,7 +247,9 @@ class TestTLSEnding:
             tls_controller.stop()
 
     @handler_data(class_=ExceptionCaptureHandler)
-    def test_tls_handshake_failing(self, tls_controller, client):
+    def test_tls_handshake_failing(
+        self, tls_controller: Controller, client: SMTPClient
+    ):
         handler = tls_controller.handler
         assert isinstance(handler, ExceptionCaptureHandler)
         try:
@@ -261,14 +265,14 @@ class TestTLSEnding:
 
 @pytest.mark.usefixtures("tls_controller")
 class TestTLSForgetsSessionData:
-    def test_forget_ehlo(self, client):
+    def test_forget_ehlo(self, client: SMTPClient):
         resp = client.starttls()
         assert resp == S.S220_READY_TLS
         resp = client.mail("sender@example.com")
         assert resp == S.S503_HELO_FIRST
 
     @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
-    def test_forget_mail(self, client):
+    def test_forget_mail(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.mail("sender@example.com")
@@ -280,7 +284,7 @@ class TestTLSForgetsSessionData:
         resp = client.rcpt("rcpt@example.com")
         assert resp == S.S503_MAIL_NEEDED
 
-    def test_forget_rcpt(self, client):
+    def test_forget_rcpt(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.mail("sender@example.com")
@@ -299,61 +303,61 @@ class TestTLSForgetsSessionData:
 
 @pytest.mark.usefixtures("tls_req_controller")
 class TestRequireTLS:
-    def test_helo_fails(self, client):
+    def test_helo_fails(self, client: SMTPClient):
         resp = client.helo("example.com")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_help_fails(self, client):
+    def test_help_fails(self, client: SMTPClient):
         resp = client.docmd("HELP", "HELO")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_ehlo(self, client):
+    def test_ehlo(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         assert "starttls" in client.esmtp_features
 
-    def test_mail_fails(self, client):
+    def test_mail_fails(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.mail("sender@example.com")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_rcpt_fails(self, client):
+    def test_rcpt_fails(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.rcpt("recipient@example.com")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_vrfy_fails(self, client):
+    def test_vrfy_fails(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.vrfy("sender@exapmle.com")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_data_fails(self, client):
+    def test_data_fails(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.docmd("DATA")
         assert resp == S.S530_STARTTLS_FIRST
 
-    def test_noop_okay(self, client):
+    def test_noop_okay(self, client: SMTPClient):
         client.ehlo("example.com")
         assert client.docmd("NOOP") == S.S250_OK
 
-    def test_quit_okay(self, client):
+    def test_quit_okay(self, client: SMTPClient):
         client.ehlo("example.com")
         assert client.docmd("QUIT") == S.S221_BYE
 
 
 @pytest.mark.usefixtures("auth_req_tls_controller")
 class TestRequireTLSAUTH:
-    def test_auth_notls(self, client):
+    def test_auth_notls(self, client: SMTPClient):
         code, _ = client.ehlo("example.com")
         assert code == 250
         resp = client.docmd("AUTH ")
         assert resp == S.S538_AUTH_ENCRYPTREQ
 
-    def test_auth_tls(self, client):
+    def test_auth_tls(self, client: SMTPClient):
         resp = client.starttls()
         assert resp == S.S220_READY_TLS
         code, _ = client.ehlo("example.com")
@@ -363,14 +367,16 @@ class TestRequireTLSAUTH:
 
 
 class TestTLSContext:
-    def test_verify_mode_nochange(self, ssl_context_server):
+    def test_verify_mode_nochange(self, ssl_context_server: ssl.SSLContext):
         context = ssl_context_server
         for mode in (ssl.CERT_NONE, ssl.CERT_OPTIONAL):  # noqa: DUO122
             context.verify_mode = mode
             _ = Server(Sink(), tls_context=context)
             assert context.verify_mode == mode
 
-    def test_certreq_warn(self, caplog, ssl_context_server):
+    def test_certreq_warn(
+        self, caplog: pytest.LogCaptureFixture, ssl_context_server: ssl.SSLContext
+    ):
         context = ssl_context_server
         context.verify_mode = ssl.CERT_REQUIRED
         _ = Server(Sink(), tls_context=context)
@@ -379,7 +385,9 @@ class TestTLSContext:
         assert "tls_context.verify_mode not in" in logmsg
         assert "might cause client connection problems" in logmsg
 
-    def test_nocertreq_chkhost_warn(self, caplog, ssl_context_server):
+    def test_nocertreq_chkhost_warn(
+        self, caplog: pytest.LogCaptureFixture, ssl_context_server: ssl.SSLContext
+    ):
         context = ssl_context_server
         context.verify_mode = ssl.CERT_OPTIONAL  # noqa: DUO122
         context.check_hostname = True

@@ -7,6 +7,7 @@ import asyncio
 import errno
 import platform
 import socket
+import ssl
 import sys
 import time
 from contextlib import ExitStack
@@ -16,7 +17,7 @@ from pathlib import Path
 from smtplib import SMTP as SMTPClient, SMTPServerDisconnected
 from tempfile import mkdtemp
 from threading import Thread
-from typing import Generator, Optional
+from typing import Callable, Generator, Optional
 
 import pytest
 from pytest_mock import MockFixture
@@ -146,7 +147,7 @@ def assert_smtp_socket(controller: UnixSocketMixin) -> bool:
 class TestServer:
     """Tests for the aiosmtpd.smtp.SMTP class"""
 
-    def test_smtp_utf8(self, plain_controller, client):
+    def test_smtp_utf8(self, plain_controller: Controller, client: SMTPClient):
         code, mesg = client.ehlo("example.com")
         assert code == 250
         assert b"SMTPUTF8" in mesg.splitlines()
@@ -201,7 +202,7 @@ class TestController:
         finally:
             cont.stop()
 
-    def test_reuse_loop(self, temp_event_loop):
+    def test_reuse_loop(self, temp_event_loop: asyncio.AbstractEventLoop):
         cont = Controller(Sink(), loop=temp_event_loop)
         assert cont.loop is temp_event_loop
         try:
@@ -211,7 +212,9 @@ class TestController:
             cont.stop()
 
     @pytest.mark.skipif(in_wsl(), reason="WSL prevents socket collision")
-    def test_socket_error_dupe(self, plain_controller, client):
+    def test_socket_error_dupe(
+        self, plain_controller: Controller, client: SMTPClient
+    ):
         contr2 = Controller(
             Sink(),
             hostname=Global.SrvAddr.host,
@@ -320,7 +323,7 @@ class TestController:
     def test_getlocalhost(self):
         assert get_localhost() in ("127.0.0.1", "::1")
 
-    def test_getlocalhost_noipv6(self, mocker):
+    def test_getlocalhost_noipv6(self, mocker: MockFixture):
         mock_hasip6 = mocker.patch("aiosmtpd.controller._has_ipv6", return_value=False)
         assert get_localhost() == "127.0.0.1"
         assert mock_hasip6.called
@@ -336,7 +339,7 @@ class TestController:
     # Apparently errno.E* constants adapts to the OS, so on Windows they will
     # automatically use the analogous WSAE* constants
     @pytest.mark.parametrize("err", [errno.EADDRNOTAVAIL, errno.EAFNOSUPPORT])
-    def test_getlocalhost_6no(self, mocker, err):
+    def test_getlocalhost_6no(self, mocker: MockFixture, err: int):
         mock_makesock: mocker.Mock = mocker.patch(
             "aiosmtpd.controller.makesock",
             side_effect=OSError(errno.EADDRNOTAVAIL, "Mock IP4-only"),
@@ -344,7 +347,7 @@ class TestController:
         assert get_localhost() == "127.0.0.1"
         mock_makesock.assert_called_with(socket.AF_INET6, socket.SOCK_STREAM)
 
-    def test_getlocalhost_6inuse(self, mocker):
+    def test_getlocalhost_6inuse(self, mocker: MockFixture):
         mock_makesock: mocker.Mock = mocker.patch(
             "aiosmtpd.controller.makesock",
             side_effect=OSError(errno.EADDRINUSE, "Mock IP6 used"),
@@ -352,7 +355,7 @@ class TestController:
         assert get_localhost() == "::1"
         mock_makesock.assert_called_with(socket.AF_INET6, socket.SOCK_STREAM)
 
-    def test_getlocalhost_error(self, mocker):
+    def test_getlocalhost_error(self, mocker: MockFixture):
         mock_makesock: mocker.Mock = mocker.patch(
             "aiosmtpd.controller.makesock",
             side_effect=OSError(errno.EFAULT, "Mock Error"),
@@ -380,7 +383,7 @@ class TestController:
 @pytest.mark.skipif(in_cygwin(), reason="Cygwin AF_UNIX is problematic")
 @pytest.mark.skipif(in_win32(), reason="Win32 does not yet fully implement AF_UNIX")
 class TestUnixSocketController:
-    def test_server_creation(self, safe_socket_dir):
+    def test_server_creation(self, safe_socket_dir: Path):
         sockfile = safe_socket_dir / "smtp"
         cont = UnixSocketController(Sink(), unix_socket=sockfile)
         try:
@@ -389,7 +392,9 @@ class TestUnixSocketController:
         finally:
             cont.stop()
 
-    def test_server_creation_ssl(self, safe_socket_dir, ssl_context_server):
+    def test_server_creation_ssl(
+        self, safe_socket_dir: Path, ssl_context_server: ssl.SSLContext
+    ):
         sockfile = safe_socket_dir / "smtp"
         cont = UnixSocketController(
             Sink(), unix_socket=sockfile, ssl_context=ssl_context_server
@@ -405,7 +410,7 @@ class TestUnixSocketController:
 
 class TestUnthreaded:
     @pytest.fixture
-    def runner(self):
+    def runner(self) -> Callable:
         thread: Optional[Thread] = None
 
         def _runner(loop: asyncio.AbstractEventLoop):
@@ -432,7 +437,12 @@ class TestUnthreaded:
 
     @pytest.mark.skipif(in_cygwin(), reason="Cygwin AF_UNIX is problematic")
     @pytest.mark.skipif(in_win32(), reason="Win32 does not yet fully implement AF_UNIX")
-    def test_unixsocket(self, safe_socket_dir, autostop_loop, runner):
+    def test_unixsocket(
+        self,
+        safe_socket_dir: Path,
+        autostop_loop: asyncio.AbstractEventLoop,
+        runner: Callable,
+    ):
         sockfile = safe_socket_dir / "smtp"
         cont = UnixSocketUnthreadedController(
             Sink(), unix_socket=sockfile, loop=autostop_loop
@@ -463,7 +473,9 @@ class TestUnthreaded:
     @pytest.mark.filterwarnings(
         "ignore::pytest.PytestUnraisableExceptionWarning"
     )
-    def test_inet_loopstop(self, autostop_loop, runner):
+    def test_inet_loopstop(
+        self, autostop_loop: asyncio.AbstractEventLoop, runner: Callable
+    ):
         """
         Verify behavior when the loop is stopped before controller is stopped
         """
@@ -501,7 +513,9 @@ class TestUnthreaded:
     @pytest.mark.filterwarnings(
         "ignore::pytest.PytestUnraisableExceptionWarning"
     )
-    def test_inet_contstop(self, temp_event_loop, runner):
+    def test_inet_contstop(
+        self, temp_event_loop: asyncio.AbstractEventLoop, runner: Callable
+    ):
         """
         Verify behavior when the controller is stopped before loop is stopped
         """

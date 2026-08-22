@@ -146,20 +146,20 @@ class PeekerHandler:
         self.sess = session
         return S.S250_OK.to_str()
 
-    async def auth_DENYMISSING(self, server, args):
+    async def auth_DENYMISSING(self, server: Server, args: List[str]):
         return MISSING
 
-    async def auth_DENYFALSE(self, server, args):
+    async def auth_DENYFALSE(self, server: Server, args: List[str]):
         return False
 
     async def auth_NONE(self, server: Server, args: List[str]):
         await server.push(S.S235_AUTH_SUCCESS.to_str())
         return None
 
-    async def auth_NULL(self, server, args):
+    async def auth_NULL(self, server: Server, args: List[str]):
         return "NULL_login"
 
-    async def auth_DONT(self, server, args):
+    async def auth_DONT(self, server: Server, args: List[str]):
         return MISSING
 
     async def auth_WITH_UNDERSCORE(self, server: Server, args: List[str]) -> str:
@@ -173,10 +173,10 @@ class PeekerHandler:
         return "250 OK"
 
     @auth_mechanism("with-dash")
-    async def auth_WITH_DASH(self, server, args):
+    async def auth_WITH_DASH(self, server: Server, args: List[str]):
         return "250 OK"
 
-    async def auth_WITH__MULTI__DASH(self, server, args):
+    async def auth_WITH__MULTI__DASH(self, server: Server, args: List[str]):
         return "250 OK"
 
 
@@ -214,10 +214,10 @@ class ErroringHandler:
 class ErroringHandlerConnectionLost:
     error = None
 
-    async def handle_DATA(self, server, session, envelope):
+    async def handle_DATA(self, server: Server, session: SMTPSession, envelope: SMTPEnvelope):
         raise ConnectionResetError("ErroringHandlerConnectionLost test")
 
-    async def handle_exception(self, error):
+    async def handle_exception(self, error: Exception):
         self.error = error
 
 
@@ -418,7 +418,7 @@ class _CommonMethods:
 
 class TestProtocol:
     def test_honors_mail_delimiters(
-        self, temp_event_loop, transport_resp, get_protocol
+        self, temp_event_loop: asyncio.AbstractEventLoop, transport_resp: Tuple[Transport, list], get_protocol: Callable
     ):
         handler = ReceivingHandler()
         protocol = get_protocol(handler)
@@ -442,7 +442,7 @@ class TestProtocol:
         assert len(handler.box) == 1
         assert handler.box[0].content == data
 
-    def test_empty_email(self, temp_event_loop, transport_resp, get_protocol):
+    def test_empty_email(self, temp_event_loop: asyncio.AbstractEventLoop, transport_resp: Tuple[Transport, list], get_protocol: Callable):
         handler = ReceivingHandler()
         protocol = get_protocol(handler)
         protocol.data_received(
@@ -537,31 +537,31 @@ class TestSMTP(_CommonMethods):
     ]
 
     @pytest.mark.parametrize("data", [b"\x80FAIL\r\n", b"\x80 FAIL\r\n"])
-    def test_binary(self, client, data):
+    def test_binary(self, client: SMTPClient, data: bytes):
         client.sock.send(data)
         assert client.getreply() == S.S500_BAD_SYNTAX
 
-    def test_helo(self, client):
+    def test_helo(self, client: SMTPClient):
         resp = client.helo("example.com")
         assert resp == S.S250_FQDN
 
-    def test_close_then_continue(self, client):
+    def test_close_then_continue(self, client: SMTPClient):
         self._helo(client)
         client.close()
         client.connect(*Global.SrvAddr)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S503_HELO_FIRST
 
-    def test_helo_no_hostname(self, client):
+    def test_helo_no_hostname(self, client: SMTPClient):
         client.local_hostname = ""
         resp = client.helo("")
         assert resp == S.S501_SYNTAX_HELO
 
-    def test_helo_duplicate(self, client):
+    def test_helo_duplicate(self, client: SMTPClient):
         self._helo(client, "example.org")
         self._helo(client, "example.com")
 
-    def test_ehlo(self, client):
+    def test_ehlo(self, client: SMTPClient):
         code, mesg = client.ehlo("example.com")
         lines = mesg.splitlines()
         assert lines == [
@@ -571,41 +571,41 @@ class TestSMTP(_CommonMethods):
             b"HELP",
         ]
 
-    def test_ehlo_duplicate(self, client):
+    def test_ehlo_duplicate(self, client: SMTPClient):
         self._ehlo(client, "example.com")
         self._ehlo(client, "example.org")
 
-    def test_ehlo_no_hostname(self, client):
+    def test_ehlo_no_hostname(self, client: SMTPClient):
         client.local_hostname = ""
         resp = client.ehlo("")
         assert resp == S.S501_SYNTAX_EHLO
 
-    def test_helo_then_ehlo(self, client):
+    def test_helo_then_ehlo(self, client: SMTPClient):
         self._helo(client, "example.com")
         self._ehlo(client, "example.org")
 
-    def test_ehlo_then_helo(self, client):
+    def test_ehlo_then_helo(self, client: SMTPClient):
         self._ehlo(client, "example.org")
         self._helo(client, "example.com")
 
-    def test_noop(self, client):
+    def test_noop(self, client: SMTPClient):
         resp = client.noop()
         assert resp == S.S250_OK
 
-    def test_noop_with_arg(self, plain_controller, client):
+    def test_noop_with_arg(self, plain_controller: Controller, client: SMTPClient):
         # smtplib.SMTP.noop() doesn't accept args
         resp = client.docmd("NOOP ok")
         assert resp == S.S250_OK
 
-    def test_quit(self, client):
+    def test_quit(self, client: SMTPClient):
         resp = client.quit()
         assert resp == S.S221_BYE
 
-    def test_quit_with_args(self, client):
+    def test_quit_with_args(self, client: SMTPClient):
         resp = client.docmd("QUIT oops")
         assert resp == S.S501_SYNTAX_QUIT
 
-    def test_help(self, client):
+    def test_help(self, client: SMTPClient):
         resp = client.docmd("HELP")
         assert resp == S.S250_SUPPCMD_NOTLS
 
@@ -624,7 +624,7 @@ class TestSMTP(_CommonMethods):
             "AUTH",
         ],
     )
-    def test_help_(self, client, command):
+    def test_help_(self, client: SMTPClient, command: str):
         resp = client.docmd(f"HELP {command}")
         syntax = getattr(S, f"S250_SYNTAX_{command}")
         assert resp == syntax
@@ -636,17 +636,17 @@ class TestSMTP(_CommonMethods):
             "RCPT",
         ],
     )
-    def test_help_esmtp(self, client, command):
+    def test_help_esmtp(self, client: SMTPClient, command: str):
         self._ehlo(client)
         resp = client.docmd(f"HELP {command}")
         syntax = getattr(S, f"S250_SYNTAX_{command}_E")
         assert resp == syntax
 
-    def test_help_bad_arg(self, client):
+    def test_help_bad_arg(self, client: SMTPClient):
         resp = client.docmd("HELP me!")
         assert resp == S.S501_SUPPCMD_NOTLS
 
-    def test_expn(self, client):
+    def test_expn(self, client: SMTPClient):
         resp = client.expn("anne@example.com")
         assert resp == S.S502_EXPN_NOTIMPL
 
@@ -655,7 +655,7 @@ class TestSMTP(_CommonMethods):
         ["MAIL FROM: <anne@example.com>", "RCPT TO: <anne@example.com>", "DATA"],
         ids=lambda x: x.split()[0],
     )
-    def test_no_helo(self, client, command):
+    def test_no_helo(self, client: SMTPClient, command: str):
         resp = client.docmd(command)
         assert resp == S.S503_HELO_FIRST
 
@@ -664,7 +664,7 @@ class TestSMTP(_CommonMethods):
         valid_mailfrom_addresses,
         ids=itertools.count(),
     )
-    def test_mail_valid_address(self, client, address):
+    def test_mail_valid_address(self, client: SMTPClient, address: str):
         self._ehlo(client)
         resp = client.docmd(f"MAIL FROM:{address}")
         assert resp == S.S250_OK
@@ -680,7 +680,7 @@ class TestSMTP(_CommonMethods):
         ],
         ids=["noarg", "nofrom", "noaddr", "params_noesmtp", "malformed"],
     )
-    def test_mail_smtp_errsyntax(self, client, command):
+    def test_mail_smtp_errsyntax(self, client: SMTPClient, command: str):
         self._helo(client)
         resp = client.docmd(command)
         assert resp == S.S501_SYNTAX_MAIL
@@ -694,12 +694,12 @@ class TestSMTP(_CommonMethods):
         ],
         ids=["norm", "extralead", "extratail"],
     )
-    def test_mail_params_esmtp(self, client, param):
+    def test_mail_params_esmtp(self, client: SMTPClient, param: str):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> " + param)
         assert resp == S.S250_OK
 
-    def test_mail_from_twice(self, client):
+    def test_mail_from_twice(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
@@ -716,17 +716,17 @@ class TestSMTP(_CommonMethods):
         ],
         ids=["malformed", "missing", "badsyntax", "space"],
     )
-    def test_mail_esmtp_errsyntax(self, client, command):
+    def test_mail_esmtp_errsyntax(self, client: SMTPClient, command: str):
         self._ehlo(client)
         resp = client.docmd(command)
         assert resp == S.S501_SYNTAX_MAIL_E
 
-    def test_mail_esmtp_params_unrecognized(self, client):
+    def test_mail_esmtp_params_unrecognized(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> FOO=BAR")
         assert resp == S.S555_MAIL_PARAMS_UNRECOG
 
-    def test_bpo27931fix_smtp(self, client):
+    def test_bpo27931fix_smtp(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd('MAIL FROM: <""@example.com>')
         assert resp == S.S250_OK
@@ -738,18 +738,18 @@ class TestSMTP(_CommonMethods):
         invalid_email_addresses,
         ids=itertools.count(),
     )
-    def test_mail_invalid_address(self, client, address):
+    def test_mail_invalid_address(self, client: SMTPClient, address: str):
         self._helo(client)
         resp = client.docmd(f"MAIL FROM: {address}")
         assert resp == S.S553_MALFORMED
 
     @pytest.mark.parametrize("address", invalid_email_addresses, ids=itertools.count())
-    def test_mail_esmtp_invalid_address(self, client, address):
+    def test_mail_esmtp_invalid_address(self, client: SMTPClient, address: str):
         self._ehlo(client)
         resp = client.docmd(f"MAIL FROM: {address} SIZE=28113")
         assert resp == S.S553_MALFORMED
 
-    def test_rcpt_no_mail(self, client):
+    def test_rcpt_no_mail(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("RCPT TO: <anne@example.com>")
         assert resp == S.S503_MAIL_NEEDED
@@ -765,7 +765,7 @@ class TestSMTP(_CommonMethods):
         ],
         ids=["noarg", "noto", "noaddr", "params", "malformed"],
     )
-    def test_rcpt_smtp_errsyntax(self, client, command):
+    def test_rcpt_smtp_errsyntax(self, client: SMTPClient, command: str):
         self._helo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
@@ -783,14 +783,14 @@ class TestSMTP(_CommonMethods):
         ],
         ids=["noarg", "noto", "noaddr", "badparams", "malformed"],
     )
-    def test_rcpt_esmtp_errsyntax(self, client, command):
+    def test_rcpt_esmtp_errsyntax(self, client: SMTPClient, command: str):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
         resp = client.docmd(command)
         assert resp == S.S501_SYNTAX_RCPT_E
 
-    def test_rcpt_unknown_params(self, client):
+    def test_rcpt_unknown_params(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
@@ -798,7 +798,7 @@ class TestSMTP(_CommonMethods):
         assert resp == S.S555_RCPT_PARAMS_UNRECOG
 
     @pytest.mark.parametrize("address", valid_rcptto_addresses, ids=itertools.count())
-    def test_rcpt_valid_address(self, client, address):
+    def test_rcpt_valid_address(self, client: SMTPClient, address: str):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
@@ -806,46 +806,46 @@ class TestSMTP(_CommonMethods):
         assert resp == S.S250_OK
 
     @pytest.mark.parametrize("address", invalid_email_addresses, ids=itertools.count())
-    def test_rcpt_invalid_address(self, client, address):
+    def test_rcpt_invalid_address(self, client: SMTPClient, address: str):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
         resp = client.docmd(f"RCPT TO: {address}")
         assert resp == S.S553_MALFORMED
 
-    def test_bpo27931fix_esmtp(self, client):
+    def test_bpo27931fix_esmtp(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd('MAIL FROM: <""@example.com> SIZE=28113')
         assert resp == S.S250_OK
         resp = client.docmd('RCPT TO: <""@example.org>')
         assert resp == S.S250_OK
 
-    def test_rset(self, client):
+    def test_rset(self, client: SMTPClient):
         resp = client.rset()
         assert resp == S.S250_OK
 
-    def test_rset_with_arg(self, client):
+    def test_rset_with_arg(self, client: SMTPClient):
         resp = client.docmd("RSET FOO")
         assert resp == S.S501_SYNTAX_RSET
 
-    def test_vrfy(self, client):
+    def test_vrfy(self, client: SMTPClient):
         resp = client.docmd("VRFY <anne@example.com>")
         assert resp == S.S252_CANNOT_VRFY
 
-    def test_vrfy_no_arg(self, client):
+    def test_vrfy_no_arg(self, client: SMTPClient):
         resp = client.docmd("VRFY")
         assert resp == S.S501_SYNTAX_VRFY
 
-    def test_vrfy_not_address(self, client):
+    def test_vrfy_not_address(self, client: SMTPClient):
         resp = client.docmd("VRFY @@")
         assert resp == S.S502_VRFY_COULDNT(b"@@")
 
-    def test_data_no_rcpt(self, client):
+    def test_data_no_rcpt(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("DATA")
         assert resp == S.S503_RCPT_NEEDED
 
-    def test_data_354(self, plain_controller, client):
+    def test_data_354(self, plain_controller: Controller, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("MAIL FROM: <alice@example.org>")
         assert resp == S.S250_OK
@@ -860,7 +860,7 @@ class TestSMTP(_CommonMethods):
         finally:
             plain_controller.stop()
 
-    def test_data_invalid_params(self, client):
+    def test_data_invalid_params(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
@@ -869,15 +869,15 @@ class TestSMTP(_CommonMethods):
         resp = client.docmd("DATA FOOBAR")
         assert resp == S.S501_SYNTAX_DATA
 
-    def test_empty_command(self, client):
+    def test_empty_command(self, client: SMTPClient):
         resp = client.docmd("")
         assert resp == S.S500_BAD_SYNTAX
 
-    def test_too_long_command(self, client):
+    def test_too_long_command(self, client: SMTPClient):
         resp = client.docmd("a" * 513)
         assert resp == S.S500_CMD_TOO_LONG
 
-    def test_way_too_long_command(self, client):
+    def test_way_too_long_command(self, client: SMTPClient):
         # Send a very large string to ensure it is broken
         # into several packets, which hits the inner
         # LimitOverrunError code path in _handle_client.
@@ -887,14 +887,14 @@ class TestSMTP(_CommonMethods):
         response = client.docmd("NOOP")
         assert response == S.S250_OK
 
-    def test_unknown_command(self, client):
+    def test_unknown_command(self, client: SMTPClient):
         resp = client.docmd("FOOBAR")
         assert resp == S.S500_CMD_UNRECOG(b"FOOBAR")
 
 
 class TestSMTPNonDecoding(_CommonMethods):
     @controller_data(decode_data=False)
-    def test_mail_invalid_body_param(self, plain_controller, client):
+    def test_mail_invalid_body_param(self, plain_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> BODY=FOOBAR")
         assert resp == S.S501_MAIL_BODY
@@ -902,21 +902,21 @@ class TestSMTPNonDecoding(_CommonMethods):
 
 @pytest.mark.usefixtures("decoding_authnotls_controller")
 class TestSMTPAuth(_CommonMethods):
-    def test_no_ehlo(self, client):
+    def test_no_ehlo(self, client: SMTPClient):
         resp = client.docmd("AUTH")
         assert resp == S.S503_EHLO_FIRST
 
-    def test_helo(self, client):
+    def test_helo(self, client: SMTPClient):
         self._helo(client)
         resp = client.docmd("AUTH")
         assert resp == S.S500_AUTH_UNRECOG
 
-    def test_not_enough_values(self, client):
+    def test_not_enough_values(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH")
         assert resp == S.S501_TOO_FEW
 
-    def test_already_authenticated(self, caplog, client):
+    def test_already_authenticated(self, caplog: pytest.LogCaptureFixture, client: SMTPClient):
         PW = "goodpasswd"
         self._ehlo(client)
         resp = client.docmd(
@@ -929,7 +929,7 @@ class TestSMTPAuth(_CommonMethods):
         assert resp == S.S250_OK
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_auth_individually(self, caplog, client):
+    def test_auth_individually(self, caplog: pytest.LogCaptureFixture, client: SMTPClient):
         """AUTH state of different clients must be independent"""
         PW = "goodpasswd"
         client1 = client
@@ -940,7 +940,7 @@ class TestSMTPAuth(_CommonMethods):
                 assert resp == S.S235_AUTH_SUCCESS
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_rset_maintain_authenticated(self, caplog, client):
+    def test_rset_maintain_authenticated(self, caplog: pytest.LogCaptureFixture, client: SMTPClient):
         """RSET resets only Envelope not Session"""
         PW = "goodpasswd"
         self._ehlo(client, "example.com")
@@ -955,7 +955,7 @@ class TestSMTPAuth(_CommonMethods):
         assert_nopassleak(PW, caplog.record_tuples)
 
     @handler_data(class_=PeekerHandler)
-    def test_auth_loginteract_warning(self, client):
+    def test_auth_loginteract_warning(self, client: SMTPClient):
         client.ehlo("example.com")
         resp = client.docmd("AUTH WITH_UNDERSCORE")
         assert resp == (334, b"challenge")
@@ -996,7 +996,7 @@ class TestAuthMechanisms(_CommonMethods):
         do.client = client
         return do
 
-    def test_ehlo(self, client):
+    def test_ehlo(self, client: SMTPClient):
         code, mesg = client.ehlo("example.com")
         assert code == 250
         lines = mesg.splitlines()
@@ -1012,17 +1012,17 @@ class TestAuthMechanisms(_CommonMethods):
         ]
 
     @pytest.mark.parametrize("mechanism", ["GSSAPI", "DIGEST-MD5", "MD5", "CRAM-MD5"])
-    def test_not_supported_mechanism(self, client, mechanism):
+    def test_not_supported_mechanism(self, client: SMTPClient, mechanism: str):
         self._ehlo(client)
         resp = client.docmd("AUTH " + mechanism)
         assert resp == S.S504_AUTH_UNRECOG
 
-    def test_custom_mechanism(self, client):
+    def test_custom_mechanism(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH NULL")
         assert resp == S.S235_AUTH_SUCCESS
 
-    def test_disabled_mechanism(self, client):
+    def test_disabled_mechanism(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH DONT")
         assert resp == S.S504_AUTH_UNRECOG
@@ -1030,7 +1030,7 @@ class TestAuthMechanisms(_CommonMethods):
     @pytest.mark.parametrize("init_resp", [True, False])
     @pytest.mark.parametrize("mechanism", ["login", "plain"])
     def test_byclient(
-        self, caplog, auth_peeker_controller, client, mechanism, init_resp
+        self, caplog: pytest.LogCaptureFixture, auth_peeker_controller: Controller, client: SMTPClient, mechanism: str, init_resp: bool
     ):
         self._ehlo(client)
         PW = "goodpasswd"
@@ -1054,32 +1054,32 @@ class TestAuthMechanisms(_CommonMethods):
         assert peeker.password == PW.encode("ascii")
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_plain1_bad_base64_encoding(self, do_auth_plain1):
+    def test_plain1_bad_base64_encoding(self, do_auth_plain1: Callable):
         resp = do_auth_plain1("not-b64")
         assert resp == S.S501_AUTH_NOTB64
 
-    def test_plain1_bad_base64_length(self, do_auth_plain1):
+    def test_plain1_bad_base64_length(self, do_auth_plain1: Callable):
         resp = do_auth_plain1(b64encode(b"\0onlylogin").decode())
         assert resp == S.S501_AUTH_CANTSPLIT
 
-    def test_plain1_too_many_values(self, do_auth_plain1):
+    def test_plain1_too_many_values(self, do_auth_plain1: Callable):
         resp = do_auth_plain1("NONE NONE")
         assert resp == S.S501_TOO_MANY
 
-    def test_plain1_bad_username(self, do_auth_plain1):
+    def test_plain1_bad_username(self, do_auth_plain1: Callable):
         resp = do_auth_plain1(b64encode(b"\0badlogin\0goodpasswd").decode())
         assert resp == S.S535_AUTH_INVALID
 
-    def test_plain1_bad_password(self, do_auth_plain1):
+    def test_plain1_bad_password(self, do_auth_plain1: Callable):
         resp = do_auth_plain1(b64encode(b"\0goodlogin\0badpasswd").decode())
         assert resp == S.S535_AUTH_INVALID
 
-    def test_plain1_empty(self, do_auth_plain1):
+    def test_plain1_empty(self, do_auth_plain1: Callable):
         resp = do_auth_plain1(B64EQUALS)
         assert resp == S.S501_AUTH_CANTSPLIT
 
     def test_plain1_good_credentials(
-        self, caplog, auth_peeker_controller, do_auth_plain1
+        self, caplog: pytest.LogCaptureFixture, auth_peeker_controller: Controller, do_auth_plain1: Callable
     ):
         PW = "goodpasswd"
         PWb = PW.encode("ascii")
@@ -1094,7 +1094,7 @@ class TestAuthMechanisms(_CommonMethods):
         assert resp == S.S250_OK
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_plain1_goodcreds_sanitized_log(self, caplog, client):
+    def test_plain1_goodcreds_sanitized_log(self, caplog: pytest.LogCaptureFixture, client: SMTPClient):
         caplog.set_level("DEBUG")
         client.ehlo("example.com")
         PW = "goodpasswd"
@@ -1118,7 +1118,7 @@ class TestAuthMechanisms(_CommonMethods):
         return client
 
     def test_plain2_good_credentials(
-        self, caplog, auth_peeker_controller, client_auth_plain2
+        self, caplog: pytest.LogCaptureFixture, auth_peeker_controller: Controller, client_auth_plain2: SMTPClient
     ):
         PW = "goodpasswd"
         PWb = PW.encode("ascii")
@@ -1132,28 +1132,28 @@ class TestAuthMechanisms(_CommonMethods):
         assert resp == S.S250_OK
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_plain2_bad_credentials(self, client_auth_plain2):
+    def test_plain2_bad_credentials(self, client_auth_plain2: SMTPClient):
         resp = client_auth_plain2.docmd(b64encode(b"\0badlogin\0badpasswd").decode())
         assert resp == S.S535_AUTH_INVALID
 
-    def test_plain2_no_credentials(self, client_auth_plain2):
+    def test_plain2_no_credentials(self, client_auth_plain2: SMTPClient):
         resp = client_auth_plain2.docmd(B64EQUALS)
         assert resp == S.S501_AUTH_CANTSPLIT
 
-    def test_plain2_abort(self, client_auth_plain2):
+    def test_plain2_abort(self, client_auth_plain2: SMTPClient):
         resp = client_auth_plain2.docmd("*")
         assert resp == S.S501_AUTH_ABORTED
 
-    def test_plain2_bad_base64_encoding(self, client_auth_plain2):
+    def test_plain2_bad_base64_encoding(self, client_auth_plain2: SMTPClient):
         resp = client_auth_plain2.docmd("ab@%")
         assert resp == S.S501_AUTH_NOTB64
 
-    def test_login2_bad_base64(self, auth_peeker_controller, client):
+    def test_login2_bad_base64(self, auth_peeker_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH LOGIN ab@%")
         assert resp == S.S501_AUTH_NOTB64
 
-    def test_login2_good_credentials(self, caplog, auth_peeker_controller, client):
+    def test_login2_good_credentials(self, caplog: pytest.LogCaptureFixture, auth_peeker_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         PW = "goodpasswd"
         PWb = PW.encode("ascii")
@@ -1172,7 +1172,7 @@ class TestAuthMechanisms(_CommonMethods):
         assert_nopassleak(PW, caplog.record_tuples)
 
     def test_login3_good_credentials(
-        self, caplog, auth_peeker_controller, do_auth_login3
+        self, caplog: pytest.LogCaptureFixture, auth_peeker_controller: Controller, do_auth_login3: Callable
     ):
         PW = "goodpasswd"
         PWb = PW.encode("ascii")
@@ -1189,49 +1189,49 @@ class TestAuthMechanisms(_CommonMethods):
         assert resp == S.S250_OK
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_login3_bad_base64(self, do_auth_login3):
+    def test_login3_bad_base64(self, do_auth_login3: Callable):
         resp = do_auth_login3("not-b64")
         assert resp == S.S501_AUTH_NOTB64
 
-    def test_login3_bad_username(self, do_auth_login3):
+    def test_login3_bad_username(self, do_auth_login3: Callable):
         resp = do_auth_login3(b64encode(b"badlogin").decode())
         assert resp == S.S334_AUTH_PASSWORD
         resp = do_auth_login3(b64encode(b"goodpasswd").decode())
         assert resp == S.S535_AUTH_INVALID
 
-    def test_login3_bad_password(self, do_auth_login3):
+    def test_login3_bad_password(self, do_auth_login3: Callable):
         resp = do_auth_login3(b64encode(b"goodlogin").decode())
         assert resp == S.S334_AUTH_PASSWORD
         resp = do_auth_login3(b64encode(b"badpasswd").decode())
         assert resp == S.S535_AUTH_INVALID
 
-    def test_login3_empty_credentials(self, do_auth_login3):
+    def test_login3_empty_credentials(self, do_auth_login3: Callable):
         resp = do_auth_login3(B64EQUALS)
         assert resp == S.S334_AUTH_PASSWORD
         resp = do_auth_login3(B64EQUALS)
         assert resp == S.S535_AUTH_INVALID
 
-    def test_login3_abort_username(self, do_auth_login3):
+    def test_login3_abort_username(self, do_auth_login3: Callable):
         resp = do_auth_login3("*")
         assert resp == S.S501_AUTH_ABORTED
 
-    def test_login3_abort_password(self, do_auth_login3):
+    def test_login3_abort_password(self, do_auth_login3: Callable):
         resp = do_auth_login3(B64EQUALS)
         assert resp == S.S334_AUTH_PASSWORD
         resp = do_auth_login3("*")
         assert resp == S.S501_AUTH_ABORTED
 
-    def test_DENYFALSE(self, client):
+    def test_DENYFALSE(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH DENYFALSE")
         assert resp == S.S535_AUTH_INVALID
 
-    def test_DENYMISSING(self, client):
+    def test_DENYMISSING(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH DENYMISSING")
         assert resp == S.S535_AUTH_INVALID
 
-    def test_NONE(self, client):
+    def test_NONE(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("AUTH NONE")
         assert resp == S.S235_AUTH_SUCCESS
@@ -1239,7 +1239,7 @@ class TestAuthMechanisms(_CommonMethods):
 
 # noinspection HardcodedPassword
 class TestAuthenticator(_CommonMethods):
-    def test_success(self, caplog, authenticator_peeker_controller, client):
+    def test_success(self, caplog: pytest.LogCaptureFixture, authenticator_peeker_controller: Controller, client: SMTPClient):
         PW = "goodpasswd"
         client.user = "gooduser"
         client.password = PW
@@ -1254,7 +1254,7 @@ class TestAuthenticator(_CommonMethods):
         assert auth_peeker.login_data == (b"gooduser", PW.encode("ascii"))
         assert_nopassleak(PW, caplog.record_tuples)
 
-    def test_fail_withmesg(self, caplog, authenticator_peeker_controller, client):
+    def test_fail_withmesg(self, caplog: pytest.LogCaptureFixture, authenticator_peeker_controller: Controller, client: SMTPClient):
         PW = "anypass"
         client.user = "failme_with454"
         client.password = PW
@@ -1286,56 +1286,56 @@ class TestRequiredAuthentication(_CommonMethods):
         resp = client.login("goodlogin", "goodpasswd")
         assert resp == S.S235_AUTH_SUCCESS
 
-    def test_help_unauthenticated(self, client):
+    def test_help_unauthenticated(self, client: SMTPClient):
         resp = client.docmd("HELP")
         assert resp == S.S530_AUTH_REQUIRED
 
-    def test_help_authenticated(self, client):
+    def test_help_authenticated(self, client: SMTPClient):
         self._login(client)
         resp = client.docmd("HELP")
         assert resp == S.S250_SUPPCMD_NOTLS
 
-    def test_vrfy_unauthenticated(self, client):
+    def test_vrfy_unauthenticated(self, client: SMTPClient):
         resp = client.docmd("VRFY <anne@example.com>")
         assert resp == S.S530_AUTH_REQUIRED
 
-    def test_mail_unauthenticated(self, client):
+    def test_mail_unauthenticated(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S530_AUTH_REQUIRED
 
-    def test_rcpt_unauthenticated(self, client):
+    def test_rcpt_unauthenticated(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("RCPT TO: <anne@example.com>")
         assert resp == S.S530_AUTH_REQUIRED
 
-    def test_rcpt_nomail_authenticated(self, client):
+    def test_rcpt_nomail_authenticated(self, client: SMTPClient):
         self._login(client)
         resp = client.docmd("RCPT TO: <anne@example.com>")
         assert resp == S.S503_MAIL_NEEDED
 
-    def test_data_unauthenticated(self, client):
+    def test_data_unauthenticated(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("DATA")
         assert resp == S.S530_AUTH_REQUIRED
 
-    def test_data_authenticated(self, client):
+    def test_data_authenticated(self, client: SMTPClient):
         self._ehlo(client, "example.com")
         client.login("goodlogin", "goodpassword")
         resp = client.docmd("DATA")
         assert resp != S.S530_AUTH_REQUIRED
 
-    def test_vrfy_authenticated(self, client):
+    def test_vrfy_authenticated(self, client: SMTPClient):
         self._login(client)
         resp = client.docmd("VRFY <anne@example.com>")
         assert resp == S.S252_CANNOT_VRFY
 
-    def test_mail_authenticated(self, client):
+    def test_mail_authenticated(self, client: SMTPClient):
         self._login(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp, S.S250_OK
 
-    def test_data_norcpt_authenticated(self, client):
+    def test_data_norcpt_authenticated(self, client: SMTPClient):
         self._login(client)
         resp = client.docmd("DATA")
         assert resp == S.S503_RCPT_NEEDED
@@ -1371,7 +1371,7 @@ class TestResetCommands:
             client.rcpt(rcpt)
 
     @handler_data(class_=StoreEnvelopeOnVRFYHandler)
-    def test_helo(self, decoding_authnotls_controller, client):
+    def test_helo(self, decoding_authnotls_controller: Controller, client: SMTPClient):
         handler = decoding_authnotls_controller.handler
         assert isinstance(handler, StoreEnvelopeOnVRFYHandler)
         # Each time through the loop, the HELO will reset the envelope.
@@ -1387,7 +1387,7 @@ class TestResetCommands:
             assert handler.envelope.rcpt_tos == data["rcpt_tos"]
 
     @handler_data(class_=StoreEnvelopeOnVRFYHandler)
-    def test_ehlo(self, decoding_authnotls_controller, client):
+    def test_ehlo(self, decoding_authnotls_controller: Controller, client: SMTPClient):
         handler = decoding_authnotls_controller.handler
         assert isinstance(handler, StoreEnvelopeOnVRFYHandler)
         # Each time through the loop, the EHLO will reset the envelope.
@@ -1403,7 +1403,7 @@ class TestResetCommands:
             assert handler.envelope.rcpt_tos == data["rcpt_tos"]
 
     @handler_data(class_=StoreEnvelopeOnVRFYHandler)
-    def test_rset(self, decoding_authnotls_controller, client):
+    def test_rset(self, decoding_authnotls_controller: Controller, client: SMTPClient):
         handler = decoding_authnotls_controller.handler
         assert isinstance(handler, StoreEnvelopeOnVRFYHandler)
         client.helo("example.com")
@@ -1423,13 +1423,13 @@ class TestResetCommands:
 
 class TestSMTPWithController(_CommonMethods):
     @controller_data(data_size_limit=9999)
-    def test_mail_with_size_too_large(self, plain_controller, client):
+    def test_mail_with_size_too_large(self, plain_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> SIZE=10000")
         assert resp == S.S552_EXCEED_SIZE
 
     @handler_data(class_=ReceivingHandler)
-    def test_mail_with_compatible_smtputf8(self, plain_controller, client):
+    def test_mail_with_compatible_smtputf8(self, plain_controller: Controller, client: SMTPClient):
         receiving_handler = plain_controller.handler
         assert isinstance(receiving_handler, ReceivingHandler)
         sender = "anne\xCB@example.com"
@@ -1444,29 +1444,29 @@ class TestSMTPWithController(_CommonMethods):
         assert receiving_handler.box[0].mail_from == sender
         assert receiving_handler.box[0].rcpt_tos == [recipient]
 
-    def test_mail_with_unrequited_smtputf8(self, plain_controller, client):
+    def test_mail_with_unrequited_smtputf8(self, plain_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com>")
         assert resp == S.S250_OK
 
-    def test_mail_with_incompatible_smtputf8(self, plain_controller, client):
+    def test_mail_with_incompatible_smtputf8(self, plain_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> SMTPUTF8=YES")
         assert resp == S.S501_SMTPUTF8_NOARG
 
-    def test_mail_invalid_body(self, plain_controller, client):
+    def test_mail_invalid_body(self, plain_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> BODY 9BIT")
         assert resp == S.S501_MAIL_BODY
 
     @controller_data(data_size_limit=None)
-    def test_esmtp_no_size_limit(self, plain_controller, client):
+    def test_esmtp_no_size_limit(self, plain_controller: Controller, client: SMTPClient):
         code, mesg = client.ehlo("example.com")
         for ln in mesg.splitlines():
             assert not ln.startswith(b"SIZE")
 
     @handler_data(class_=ErroringHandler)
-    def test_process_message_error(self, error_controller, client):
+    def test_process_message_error(self, error_controller: Controller, client: SMTPClient):
         self._ehlo(client)
         with pytest.raises(SMTPDataError) as excinfo:
             client.sendmail(
@@ -1485,7 +1485,7 @@ class TestSMTPWithController(_CommonMethods):
         assert excinfo.value.args == (499, b"Could not accept the message")
 
     @controller_data(data_size_limit=100)
-    def test_too_long_message_body(self, plain_controller, client):
+    def test_too_long_message_body(self, plain_controller: Controller, client: SMTPClient):
         self._helo(client)
         mail = "\r\n".join(["z" * 20] * 10)
         with pytest.raises(SMTPResponseException) as excinfo:
@@ -1493,7 +1493,7 @@ class TestSMTPWithController(_CommonMethods):
         assert excinfo.value.args == S.S552_DATA_TOO_MUCH
 
     @handler_data(class_=ReceivingHandler)
-    def test_dots_escaped(self, decoding_authnotls_controller, client):
+    def test_dots_escaped(self, decoding_authnotls_controller: Controller, client: SMTPClient):
         receiving_handler = decoding_authnotls_controller.handler
         assert isinstance(receiving_handler, ReceivingHandler)
         self._helo(client)
@@ -1503,21 +1503,21 @@ class TestSMTPWithController(_CommonMethods):
         assert receiving_handler.box[0].content == mail + CRLF
 
     @handler_data(class_=ErroringHandler)
-    def test_unexpected_errors(self, error_controller, client):
+    def test_unexpected_errors(self, error_controller: Controller, client: SMTPClient):
         handler = error_controller.handler
         resp = client.helo("example.com")
         assert resp == (500, b"ErroringHandler handling error")
         exception_type = ErrorSMTP.exception_type
         assert isinstance(handler.error, exception_type)
 
-    def test_unexpected_errors_unhandled(self, error_controller, client):
+    def test_unexpected_errors_unhandled(self, error_controller: Controller, client: SMTPClient):
         resp = client.helo("example.com")
         exception_type = ErrorSMTP.exception_type
         exception_nameb = exception_type.__name__.encode("ascii")
         assert resp == (500, b"Error: (" + exception_nameb + b") test")
 
     @handler_data(class_=ErroringHandler)
-    def test_unexpected_errors_custom_response(self, error_controller, client):
+    def test_unexpected_errors_custom_response(self, error_controller: Controller, client: SMTPClient):
         erroring_handler = error_controller.handler
         erroring_handler.custom_response = True
         resp = client.helo("example.com")
@@ -1527,7 +1527,7 @@ class TestSMTPWithController(_CommonMethods):
         assert resp == (451, b"Temporary error: (" + exception_nameb + b") test")
 
     @handler_data(class_=ErroringErrorHandler)
-    def test_exception_handler_exception(self, error_controller, client):
+    def test_exception_handler_exception(self, error_controller: Controller, client: SMTPClient):
         handler = error_controller.handler
         resp = client.helo("example.com")
         assert resp == (500, b"Error: (ValueError) ErroringErrorHandler test")
@@ -1535,7 +1535,7 @@ class TestSMTPWithController(_CommonMethods):
         assert isinstance(handler.error, exception_type)
 
     @handler_data(class_=UndescribableErrorHandler)
-    def test_exception_handler_undescribable(self, error_controller, client):
+    def test_exception_handler_undescribable(self, error_controller: Controller, client: SMTPClient):
         handler = error_controller.handler
         resp = client.helo("example.com")
         assert resp == (500, b"Error: Cannot describe error")
@@ -1544,7 +1544,7 @@ class TestSMTPWithController(_CommonMethods):
 
     @handler_data(class_=ErroringHandlerConnectionLost)
     def test_exception_handler_multiple_connections_lost(
-        self, error_controller, client
+        self, error_controller: Controller, client: SMTPClient
     ):
         client1 = client
         code, mesg = client1.ehlo("example.com")
@@ -1566,7 +1566,7 @@ class TestSMTPWithController(_CommonMethods):
         assert resp == S.S250_OK
 
     @handler_data(class_=ReceivingHandler)
-    def test_bad_encodings(self, decoding_authnotls_controller, client):
+    def test_bad_encodings(self, decoding_authnotls_controller: Controller, client: SMTPClient):
         handler: ReceivingHandler = decoding_authnotls_controller.handler
         self._helo(client)
         mail_from = b"anne\xFF@example.com"
@@ -1585,7 +1585,7 @@ class TestSMTPWithController(_CommonMethods):
         assert mail_to2 == mail_to
 
     @controller_data(decode_data=False)
-    def test_data_line_too_long(self, plain_controller, client):
+    def test_data_line_too_long(self, plain_controller: Controller, client: SMTPClient):
         self._helo(client)
         client.helo("example.com")
         mail = b"\r\n".join([b"a" * 5555] * 3)
@@ -1594,7 +1594,7 @@ class TestSMTPWithController(_CommonMethods):
         assert exc.value.args == S.S500_DATALINE_TOO_LONG
 
     @controller_data(data_size_limit=10000)
-    def test_long_line_double_count(self, plain_controller, client):
+    def test_long_line_double_count(self, plain_controller: Controller, client: SMTPClient):
         # With a read limit of 1001 bytes in aiosmtp.SMTP, asyncio.StreamReader
         # returns too-long lines of length up to 2002 bytes.
         # This test ensures that bytes in partial lines are only counted once.
@@ -1626,7 +1626,7 @@ class TestSMTPWithController(_CommonMethods):
         #                  b'Line too long (see RFC5321 4.5.3.1.6)')
 
     @controller_data(data_size_limit=20)
-    def test_too_long_body_delay_error(self, plain_controller):
+    def test_too_long_body_delay_error(self, plain_controller: Controller):
         with socket.socket() as sock:
             sock.connect((plain_controller.hostname, plain_controller.port))
             rslt = send_recv(sock, b"EHLO example.com")
@@ -1645,7 +1645,7 @@ class TestSMTPWithController(_CommonMethods):
             assert rslt == b"552 Error: Too much mail data\r\n"
 
     @controller_data(data_size_limit=700)
-    def test_too_long_body_then_too_long_lines(self, plain_controller, client):
+    def test_too_long_body_then_too_long_lines(self, plain_controller: Controller, client: SMTPClient):
         # If "too much mail" state was reached before "too long line" gets received,
         # SMTP should respond with '552' instead of '500'
         client.helo("example.com")
@@ -1654,7 +1654,7 @@ class TestSMTPWithController(_CommonMethods):
             client.sendmail("anne@example.com", ["bart@example.com"], mail)
         assert exc.value.args == S.S552_DATA_TOO_MUCH
 
-    def test_too_long_line_delay_error(self, plain_controller):
+    def test_too_long_line_delay_error(self, plain_controller: Controller):
         with socket.socket() as sock:
             sock.connect((plain_controller.hostname, plain_controller.port))
             rslt = send_recv(sock, b"EHLO example.com")
@@ -1673,7 +1673,7 @@ class TestSMTPWithController(_CommonMethods):
             assert rslt == S.S500_DATALINE_TOO_LONG.to_bytes(crlf=True)
 
     @controller_data(data_size_limit=2000)
-    def test_too_long_lines_then_too_long_body(self, plain_controller, client):
+    def test_too_long_lines_then_too_long_body(self, plain_controller: Controller, client: SMTPClient):
         # If "too long line" state was reached before "too much data" happens,
         # SMTP should respond with '500' instead of '552'
         client.helo("example.com")
@@ -1685,12 +1685,12 @@ class TestSMTPWithController(_CommonMethods):
 
 class TestCustomization(_CommonMethods):
     @controller_data(class_=CustomHostnameController)
-    def test_custom_hostname(self, plain_controller, client):
+    def test_custom_hostname(self, plain_controller: Controller, client: SMTPClient):
         code, mesg = client.helo("example.com")
         assert code == 250
         assert mesg == CustomHostnameController.custom_name.encode("ascii")
 
-    def test_default_greeting(self, plain_controller, client):
+    def test_default_greeting(self, plain_controller: Controller, client: SMTPClient):
         controller = plain_controller
         code, mesg = client.connect(controller.hostname, controller.port)
         assert code == 220
@@ -1698,7 +1698,7 @@ class TestCustomization(_CommonMethods):
         assert mesg.endswith(bytes(GREETING, "utf-8"))
 
     @controller_data(class_=CustomIdentController)
-    def test_custom_greeting(self, plain_controller, client):
+    def test_custom_greeting(self, plain_controller: Controller, client: SMTPClient):
         controller = plain_controller
         code, mesg = client.connect(controller.hostname, controller.port)
         assert code == 220
@@ -1706,12 +1706,12 @@ class TestCustomization(_CommonMethods):
         assert mesg.endswith(CustomIdentController.ident)
 
     @controller_data(decode_data=False)
-    def test_mail_invalid_body_param(self, plain_controller, client):
+    def test_mail_invalid_body_param(self, plain_controller: Controller, client: SMTPClient):
         client.ehlo("example.com")
         resp = client.docmd("MAIL FROM: <anne@example.com> BODY=FOOBAR")
         assert resp == S.S501_MAIL_BODY
 
-    def test_limitlocalpart(self, plain_controller, client):
+    def test_limitlocalpart(self, plain_controller: Controller, client: SMTPClient):
         plain_controller.smtpd.local_part_limit = 64
         client.ehlo("example.com")
         locpart = "a" * 64
@@ -1768,7 +1768,7 @@ class TestClientCrash(_CommonMethods):
         # Should be called at least once. (In practice, almost certainly just once.)
         assert spy.call_count > 0
 
-    def test_connection_reset_in_long_command(self, plain_controller, client):
+    def test_connection_reset_in_long_command(self, plain_controller: Controller, client: SMTPClient):
         client.send("F" + 5555 * "O")  # without CRLF
         reset_connection(client)
         catchup_delay()
@@ -1780,7 +1780,7 @@ class TestClientCrash(_CommonMethods):
         # and still == True if transport is closed.
         assert writer.transport.is_closing()
 
-    def test_close_in_command(self, plain_controller, client):
+    def test_close_in_command(self, plain_controller: Controller, client: SMTPClient):
         # Don't include the CRLF.
         client.send("FOO")
         client.close()
@@ -1811,7 +1811,7 @@ class TestClientCrash(_CommonMethods):
         # and still == True if transport is closed.
         assert writer.transport.is_closing()
 
-    def test_close_in_long_command(self, plain_controller, client):
+    def test_close_in_long_command(self, plain_controller: Controller, client: SMTPClient):
         client.send("F" + 5555 * "O")  # without CRLF
         client.close()
         catchup_delay()
@@ -1872,21 +1872,21 @@ class TestClientCrash(_CommonMethods):
 @pytest.mark.usefixtures("plain_controller")
 @controller_data(enable_SMTPUTF8=False, decode_data=True)
 class TestStrictASCII(_CommonMethods):
-    def test_ehlo(self, client):
+    def test_ehlo(self, client: SMTPClient):
         blines = self._ehlo(client)
         assert b"SMTPUTF8" not in blines
 
-    def test_bad_encoded_param(self, client):
+    def test_bad_encoded_param(self, client: SMTPClient):
         self._ehlo(client)
         client.send(b"MAIL FROM: <anne\xFF@example.com>\r\n")
         assert client.getreply() == S.S500_STRICT_ASCII
 
-    def test_mail_param(self, client):
+    def test_mail_param(self, client: SMTPClient):
         self._ehlo(client)
         resp = client.docmd("MAIL FROM: <anne@example.com> SMTPUTF8")
         assert resp == S.S501_SMTPUTF8_DISABLED
 
-    def test_data(self, client):
+    def test_data(self, client: SMTPClient):
         self._ehlo(client)
         with pytest.raises(SMTPDataError) as excinfo:
             client.sendmail(
@@ -1906,7 +1906,7 @@ class TestSleepingHandler(_CommonMethods):
 
     @controller_data(decode_data=False)
     @handler_data(class_=SleepingHeloHandler)
-    def test_close_after_helo(self, plain_controller, client):
+    def test_close_after_helo(self, plain_controller: Controller, client: SMTPClient):
         #
         # What are we actually testing?
         #
@@ -1918,7 +1918,7 @@ class TestSleepingHandler(_CommonMethods):
 
 class TestTimeout(_CommonMethods):
     @controller_data(class_=TimeoutController)
-    def test_timeout(self, plain_controller, client):
+    def test_timeout(self, plain_controller: Controller, client: SMTPClient):
         # This one is rapid, it must succeed
         self._ehlo(client)
         time.sleep(0.1 + TimeoutController.Delay)
@@ -1927,7 +1927,7 @@ class TestTimeout(_CommonMethods):
 
 
 class TestAuthArgs:
-    def test_warn_authreqnotls(self, caplog):
+    def test_warn_authreqnotls(self, caplog: pytest.LogCaptureFixture):
         with pytest.warns(UserWarning, match="Requiring AUTH") as record:
             _ = Server(Sink(), auth_required=True, auth_require_tls=False)
         for warning in record:
@@ -1946,7 +1946,7 @@ class TestAuthArgs:
             "auth_required == True but auth_require_tls == False",
         )
 
-    def test_log_authmechanisms(self, caplog):
+    def test_log_authmechanisms(self, caplog: pytest.LogCaptureFixture):
         caplog.set_level(logging.INFO)
         server = Server(Sink())
         auth_mechs = sorted(
@@ -1968,7 +1968,7 @@ class TestAuthArgs:
             "has\\backslash",
         ],
     )
-    def test_authmechname_decorator_badname(self, name):
+    def test_authmechname_decorator_badname(self, name: str):
         expectre = r"Invalid AUTH mechanism name"
         with pytest.raises(ValueError, match=expectre):
             auth_mechanism(name)
@@ -2006,11 +2006,11 @@ class TestLimits(_CommonMethods):
         assert exc.value.args[0] == "All command_call_limit values must be int"
 
     @controller_data(command_call_limit=15)
-    def test_all_limit_15(self, plain_controller, client):
+    def test_all_limit_15(self, plain_controller: Controller, client: SMTPClient):
         self._consume_budget(client, 15, "noop")
 
     @controller_data(command_call_limit={"NOOP": 15, "EXPN": 5})
-    def test_different_limits(self, plain_controller, client):
+    def test_different_limits(self, plain_controller: Controller, client: SMTPClient):
         srv_ip_port = plain_controller.hostname, plain_controller.port
 
         self._consume_budget(client, 15, "noop")
@@ -2030,7 +2030,7 @@ class TestLimits(_CommonMethods):
         )
 
     @controller_data(command_call_limit={"NOOP": 7, "EXPN": 5, "*": 25})
-    def test_different_limits_custom_default(self, plain_controller, client):
+    def test_different_limits_custom_default(self, plain_controller: Controller, client: SMTPClient):
         # Important: make sure default_max > CALL_LIMIT_DEFAULT
         # Others can be set small to cut down on testing time, but must be different
         assert plain_controller.smtpd._call_limit_default > CALL_LIMIT_DEFAULT
@@ -2053,7 +2053,7 @@ class TestLimits(_CommonMethods):
         )
 
     @controller_data(command_call_limit=7)
-    def test_limit_bogus(self, plain_controller, client):
+    def test_limit_bogus(self, plain_controller: Controller, client: SMTPClient):
         assert plain_controller.smtpd._call_limit_default > BOGUS_LIMIT
         code, mesg = client.ehlo("example.com")
         assert code == 250
