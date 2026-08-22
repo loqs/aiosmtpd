@@ -41,7 +41,7 @@ class FromCliHandler:
         self.called = called
 
     @classmethod
-    def from_cli(cls, parser: ArgumentParser, *args: str):
+    def from_cli(cls, parser: ArgumentParser, *args: str) -> "FromCliHandler":
         return cls(*args)
 
 

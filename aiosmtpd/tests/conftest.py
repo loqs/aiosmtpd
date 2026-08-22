@@ -65,7 +65,7 @@ class Global:
     FQDN: str = socket.getfqdn()
 
     @classmethod
-    def set_addr_from(cls, contr: Controller):
+    def set_addr_from(cls, contr: Controller) -> None:
         cls.SrvAddr = HostPort(contr.hostname, contr.port)
 
 
