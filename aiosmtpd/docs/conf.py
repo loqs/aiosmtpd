@@ -16,7 +16,12 @@
 import datetime
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
+
+from docutils import nodes
+from sphinx.addnodes import pending_xref
+from sphinx.application import Sphinx
+from sphinx.environment import BuildEnvironment
 
 import sphinx_rtd_theme  # noqa: F401 # pytype: disable=import-error
 
@@ -336,5 +341,31 @@ texinfo_documents = [
 # endregion
 
 
+def resolve_missing_reference(
+    app: Sphinx,
+    env: BuildEnvironment,
+    node: pending_xref,
+    contnode: nodes.Element,
+) -> Optional[nodes.reference]:
+    if (
+        node.get("reftarget") == "aiosmtpd.smtp.AuthenticatorType"
+        and node.get("reftype") == "class"
+    ):
+        domain = env.get_domain("py")
+        resolved_node = domain.resolve_xref(
+            env,
+            node.get("refdoc", ""),
+            app.builder,
+            "data",
+            "aiosmtpd.smtp.AuthenticatorType",
+            node,
+            contnode,
+        )
+        if resolved_node is not None:
+            return resolved_node
+    return None
+
+
 def setup(app):  # noqa: ANN001
     app.add_css_file("aiosmtpd.css")
+    app.connect("missing-reference", resolve_missing_reference)
